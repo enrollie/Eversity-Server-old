@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2021.
+ * Author: Pavel Matusevich.
+ * Licensed under GNU AGPLv3.
+ * All rights are reserved.
+ */
+
 package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
@@ -19,11 +26,21 @@ object EversityDatabase {
      * @return true, if user exists. false otherwise
      */
     fun doesUserExist(userID: Int): Boolean {
-        val result = transaction {
-            val query: Query = Users.select { Users.id eq userID }
-            query.toList()
-        }
-        return result.isEmpty()
+        return transaction {
+            Users.select { Users.id eq userID }.toList()
+        }.isNotEmpty()
+    }
+
+    /**
+     * Checks, whether class exists.
+     * @param classID ID of class
+     *
+     * @return True, if class exists. False otherwise.
+     */
+    fun doesClassExist(classID: Int): Boolean {
+        return transaction {
+            Classes.select { Classes.classID eq classID }.toList()
+        }.isNotEmpty()
     }
 
     /**
@@ -82,16 +99,22 @@ object EversityDatabase {
      * @param classID Class ID of given pupil
      * @see registerManyPupils
      * @return False, if pupil already exists. True, if operation succeed
+     * @throws IllegalArgumentException Thrown, if pupil's class is not yet registered.
      */
     fun registerPupil(userID: Int, name: Pair<String, String>, classID: Int): Boolean {
         if (doesUserExist(userID)) {
             return false
+        }
+        if (!doesClassExist(classID)){
+           throw IllegalArgumentException("Class with ID $classID does not yet exist. Pupil with ID $userID cannot be registered.")
         }
         transaction {
             Users.insert {
                 it[id] = userID
                 it[type] = APIUserType.Pupil.name
             }
+        }
+        transaction {
             Pupils.insert {
                 it[id] = userID
                 it[this.classID] = classID
@@ -253,7 +276,7 @@ object EversityDatabase {
                 Tokens.token eq token
             }.toList().isNotEmpty()
         }
-        if (foundInValid){
+        if (foundInValid) {
             return Pair(true, null)
         }
         val foundBanned = transaction {
@@ -261,7 +284,7 @@ object EversityDatabase {
                 BannedTokens.token eq token
             }.toList()
         }
-        if (foundBanned.isEmpty()){
+        if (foundBanned.isEmpty()) {
             return Pair(false, null)
         }
         val banReason = foundBanned.firstOrNull() ?: return Pair(false, null)

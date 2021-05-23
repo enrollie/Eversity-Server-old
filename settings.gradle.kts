@@ -1,1 +1,1 @@
-rootProject.name = "educad-server"
+rootProject.name = "eversity-server"

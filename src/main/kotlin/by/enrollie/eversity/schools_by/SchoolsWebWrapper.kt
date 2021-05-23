@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2021.
+ * Author: Pavel Matusevich.
+ * Licensed under GNU AGPLv3.
+ * All rights are reserved.
+ */
+
 package by.enrollie.eversity.schools_by
 
 import by.enrollie.eversity.data_classes.Pupil
@@ -133,9 +140,10 @@ class SchoolsWebWrapper {
      *
      * @return true if cookies are valid, false otherwise
      */
-    suspend fun checkCookies(cookies:Pair<String,String>? = null, changeInternal:Boolean = true):Boolean{
+    suspend fun checkCookies(cookies: Pair<String, String>? = null, changeInternal: Boolean = true): Boolean {
+        TODO("FIX THIS! GIVES WRONG RESULT!")
         val response = HttpClient().use {
-            return@use it.request<HttpResponse>{
+            return@use it.request<HttpResponse> {
                 url.takeFrom("${subdomainURL}teachers")
                 method = HttpMethod.Get
                 cookie("csrftoken", cookies?.first ?: schoolsBYCookies.first)
@@ -144,20 +152,20 @@ class SchoolsWebWrapper {
         }
         try {
             val html = response.receive<String>()
-            htmlDocument(html){
-                form{
+            htmlDocument(html) {
+                form {
                     withAttribute = Pair("method", "post")
-                    findAll{
+                    findAll {
                         //If found, cookies are not valid. Will return false at end.
                     }
                 }
             }
-        } catch (e: NoTransformationFoundException){
+        } catch (e: NoTransformationFoundException) {
             //TODO: Add log
-                e.printStackTrace()
+            e.printStackTrace()
             return false //Did not recieve page correctly.
-        } catch (e: ElementNotFoundException){
-            if(changeInternal && cookies != null){
+        } catch (e: ElementNotFoundException) {
+            if (changeInternal && cookies != null) {
                 schoolsBYCookies = cookies
             }
             return true //Login form not found => we are logged in.
@@ -174,7 +182,7 @@ class SchoolsWebWrapper {
      * @throws IllegalArgumentException Thrown, if no pupils found.
      */
     suspend fun getPupilsArray(classID: Int): Array<Pupil> {
-        val response = client.request<HttpResponse>{
+        val response = client.request<HttpResponse> {
             url.takeFrom("$subdomainURL/class/$classID")
             method = HttpMethod.Get
         }
@@ -208,5 +216,39 @@ class SchoolsWebWrapper {
             throw IllegalArgumentException()
         }
         return pupilsArray
+    }
+
+    /**
+     *
+     *
+     * @param classID ID of needed class
+     *
+     * @return [Array] of [Pupil] from given [classID]
+     * @throws IllegalArgumentException Thrown, if no pupils found.
+     */
+    suspend fun getClassTeacher(classID: Int): Int {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("$subdomainURL/class/$classID")
+            method = HttpMethod.Get
+        }
+        val pageString = response.receive<String>()
+        var classTeacherID: Int
+
+        try {
+            htmlDocument(pageString) {
+                div {
+                    withClass = "r_user_info"
+                    findAll {
+                        a {
+                            findFirst {
+                                classTeacherID = this.attribute("href").removePrefix("/teacher/").toInt()
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+            throw IllegalArgumentException()
+        }
     }
 }
