@@ -66,12 +66,12 @@ object EversityDatabase {
      *
      * @return False, if user already exists. True, if operation succeed
      */
-    fun registerClassTeacher(
+    fun registerTeacher(
         userID: Int,
         fullName: Triple<String, String, String>,
         cookies: Pair<String, String>,
         tokenAPI: String,
-        classID: Int
+        classID: Int? = null
     ): Boolean {
         if (doesUserExist(userID)) {
             return false
@@ -88,38 +88,6 @@ object EversityDatabase {
         }
         insertOrUpdateCredentials(userID, Triple(cookies.first, cookies.second, tokenAPI))
         return true
-    }
-
-    /**
-     * Registers teacher (does not check for credentials validity). Does not register timetables
-     *
-     * @param userID User ID of class teacher
-     * @param fullName [Triple] First - First name, Second - Middle name, Third - Last name
-     * @param cookies [Pair] First - csrftoken, second - sessionID
-     * @param tokenAPI Token for Schools.by API
-     *
-     */
-    fun registerTeacher(
-        userID: Int,
-        fullName: Triple<String, String, String>,
-        cookies: Pair<String, String>,
-        tokenAPI: String
-    ) {
-        if (doesUserExist(userID)) {
-            return
-        }
-        registerUser(userID, APIUserType.Teacher.name)
-        transaction {
-            Teachers.insert {
-                it[id] = userID
-                it[firstName] = fullName.first
-                it[middleName] = fullName.second
-                it[lastName] = fullName.third
-                it[classID] = null
-            }
-        }
-        insertOrUpdateCredentials(userID, Triple(cookies.first, cookies.second, tokenAPI))
-        return
     }
 
     /**
@@ -142,6 +110,7 @@ object EversityDatabase {
         }
         registerUser(userID, APIUserType.Pupil.name)
         if (!doesUserExist(userID)) {
+            //TODO: Log this
             throw UnknownError("registerUser() was called, but user does not exist.")
         }
         transaction {
@@ -175,37 +144,8 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
     fun registerClassTimetable(classID: Int, daysMap: Map<DayOfWeek, TimetableDay>) {
-        if (daysMap.size < 6 || daysMap.size > 7) {
-            println(Json.encodeToString(daysMap))
-            throw IllegalArgumentException("daysArray size is less than six OR more than 7")
-        }
-        for (i in 0 until 6) {
-            when (i) {
-                DayOfWeek.MONDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
-                        throw IllegalArgumentException("daysArray does not contain Monday")
-                }
-                DayOfWeek.TUESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
-                        throw IllegalArgumentException("daysArray does not contain Tuesday")
-                }
-                DayOfWeek.WEDNESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
-                        throw IllegalArgumentException("daysArray does not contain Wednesday")
-                }
-                DayOfWeek.THURSDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
-                        throw IllegalArgumentException("daysArray does not contain Thursday")
-                }
-                DayOfWeek.FRIDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
-                        throw IllegalArgumentException("daysArray does not contain Friday")
-                }
-                DayOfWeek.SATURDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
-                        throw IllegalArgumentException("daysArray does not contain Saturday")
-                }
-            }
+        if (!validateDaysMap(daysMap)){
+            throw IllegalArgumentException("daysMap is not valid.")
         }
         transaction {
             ClassTimetables.insert {
@@ -230,7 +170,7 @@ object EversityDatabase {
     fun issueToken(userID: Int): String {
         var issuedToken: String = ""
         run {
-            var newToken: UUID = UUID.randomUUID()
+            var newToken: UUID
             while (1 in 1..1) { //making sure that generated token is not seen anywhere
                 newToken = UUID.randomUUID()
                 val sameIssuedTokens = transaction {
@@ -428,33 +368,8 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
     fun registerTeacherTimetable(teacherID: Int, daysMap: Map<DayOfWeek, Array<TeacherLesson>>) {
-        for (i in 0 until 6) {
-            when (i) {
-                DayOfWeek.MONDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
-                        throw IllegalArgumentException("daysArray does not contain Monday")
-                }
-                DayOfWeek.TUESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
-                        throw IllegalArgumentException("daysArray does not contain Tuesday")
-                }
-                DayOfWeek.WEDNESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
-                        throw IllegalArgumentException("daysArray does not contain Wednesday")
-                }
-                DayOfWeek.THURSDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
-                        throw IllegalArgumentException("daysArray does not contain Thursday")
-                }
-                DayOfWeek.FRIDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
-                        throw IllegalArgumentException("daysArray does not contain Friday")
-                }
-                DayOfWeek.SATURDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
-                        throw IllegalArgumentException("daysArray does not contain Saturday")
-                }
-            }
+        if (!validateDaysMap(daysMap)){
+            throw IllegalArgumentException("daysMap is not valid.")
         }
         transaction {
             TeachersTimetable.insert {
@@ -537,5 +452,39 @@ object EversityDatabase {
         TODO("To be implemented in v0.0.2")
 //        if(user[Users.type] != "Pupil")
         return 5
+    }
+
+    private fun validateDaysMap(daysMap: Map<DayOfWeek, Any>):Boolean{
+        if (daysMap.size !in 6..7)
+            return false
+        for (i in 0 until 6) {
+            when (i) {
+                DayOfWeek.MONDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
+                        return false
+                }
+                DayOfWeek.TUESDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
+                        return false
+                }
+                DayOfWeek.WEDNESDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
+                        return false
+                }
+                DayOfWeek.THURSDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
+                        return false
+                }
+                DayOfWeek.FRIDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
+                        return false
+                }
+                DayOfWeek.SATURDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
+                        return false
+                }
+            }
+        }
+        return true
     }
 }

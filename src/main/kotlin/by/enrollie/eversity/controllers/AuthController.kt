@@ -83,7 +83,7 @@ class AuthController {
                 val classStr = schoolsWeb.fetchClassForCurrentUser()
                 if (classStr != null) {
                     registrar.registerClass(classStr, schoolsWeb)
-                    EversityDatabase.registerClassTeacher(
+                    EversityDatabase.registerTeacher(
                         userID,
                         Triple(
                             userData["first_name"]?.jsonPrimitive?.content.toString(),
