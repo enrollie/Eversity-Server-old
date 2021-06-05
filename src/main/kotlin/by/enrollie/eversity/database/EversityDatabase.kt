@@ -9,11 +9,20 @@ package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.tables.*
+import by.enrollie.eversity.exceptions.UserNotRegistered
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
+import org.joda.time.Hours
 import java.util.*
+import kotlin.NoSuchElementException
+
+/**
+ * Temporary cache of valid access tokens.
+ */
+var validTokensList = mutableListOf<Triple<Int, String, DateTime>>()
 
 /**
  * Interface to communicate with Eversity Database.
@@ -26,9 +35,11 @@ object EversityDatabase {
      * @return true, if user exists. false otherwise
      */
     fun doesUserExist(userID: Int): Boolean {
-        return transaction {
+        val tos = transaction {
             Users.select { Users.id eq userID }.toList()
-        }.isNotEmpty()
+        }
+        println(tos.joinToString())
+        return tos.isNotEmpty()
     }
 
     /**
@@ -44,7 +55,7 @@ object EversityDatabase {
     }
 
     /**
-     * Registers class teacher (does not check for credentials validity) and class itself.
+     * Registers class teacher (does not check for credentials validity).
      * (does not register pupils, neither timetables)
      *
      * @param userID User ID of class teacher
@@ -65,11 +76,8 @@ object EversityDatabase {
         if (doesUserExist(userID)) {
             return false
         }
+        registerUser(userID, APIUserType.Teacher.name)
         transaction {
-            Users.insert {
-                it[id] = userID
-                it[type] = APIUserType.Teacher.name
-            }
             Teachers.insert {
                 it[id] = userID
                 it[firstName] = fullName.first
@@ -77,18 +85,41 @@ object EversityDatabase {
                 it[lastName] = fullName.third
                 it[this.classID] = classID
             }
-            Credentials.insert {
+        }
+        insertOrUpdateCredentials(userID, Triple(cookies.first, cookies.second, tokenAPI))
+        return true
+    }
+
+    /**
+     * Registers teacher (does not check for credentials validity). Does not register timetables
+     *
+     * @param userID User ID of class teacher
+     * @param fullName [Triple] First - First name, Second - Middle name, Third - Last name
+     * @param cookies [Pair] First - csrftoken, second - sessionID
+     * @param tokenAPI Token for Schools.by API
+     *
+     */
+    fun registerTeacher(
+        userID: Int,
+        fullName: Triple<String, String, String>,
+        cookies: Pair<String, String>,
+        tokenAPI: String
+    ) {
+        if (doesUserExist(userID)) {
+            return
+        }
+        registerUser(userID, APIUserType.Teacher.name)
+        transaction {
+            Teachers.insert {
                 it[id] = userID
-                it[csrfToken] = cookies.first
-                it[sessionID] = cookies.second
-                it[token] = tokenAPI
-            }
-            Classes.insert {
-                it[classTeacher] = userID
-                it[this.classID] = classID
+                it[firstName] = fullName.first
+                it[middleName] = fullName.second
+                it[lastName] = fullName.third
+                it[classID] = null
             }
         }
-        return true
+        insertOrUpdateCredentials(userID, Triple(cookies.first, cookies.second, tokenAPI))
+        return
     }
 
     /**
@@ -100,19 +131,18 @@ object EversityDatabase {
      * @see registerManyPupils
      * @return False, if pupil already exists. True, if operation succeed
      * @throws IllegalArgumentException Thrown, if pupil's class is not yet registered.
+     * @throws UnknownError Thrown, if registerUser() was called, but [doesUserExist] returned false (user does not exist)
      */
     fun registerPupil(userID: Int, name: Pair<String, String>, classID: Int): Boolean {
         if (doesUserExist(userID)) {
             return false
         }
-        if (!doesClassExist(classID)){
-           throw IllegalArgumentException("Class with ID $classID does not yet exist. Pupil with ID $userID cannot be registered.")
+        if (!doesClassExist(classID)) {
+            throw IllegalArgumentException("Class with ID $classID does not yet exist. Pupil with ID $userID cannot be registered.")
         }
-        transaction {
-            Users.insert {
-                it[id] = userID
-                it[type] = APIUserType.Pupil.name
-            }
+        registerUser(userID, APIUserType.Pupil.name)
+        if (!doesUserExist(userID)) {
+            throw UnknownError("registerUser() was called, but user does not exist.")
         }
         transaction {
             Pupils.insert {
@@ -129,7 +159,6 @@ object EversityDatabase {
      * Registers many pupils at once. (does not register their timetables).
      * Ignores pupil if it already exists.
      * @param array Array, containing [Pupil]s to register
-     * @return Nothing
      */
     fun registerManyPupils(array: Array<Pupil>) {
         array.forEach { pupil ->
@@ -141,41 +170,39 @@ object EversityDatabase {
      * Registers (or, overwrites, if exists) timetable for class
      *
      * @param classID ID of pupil
-     * @param daysArray Array of [TimetableDay]s. MUST contain at least six elements (days) AND less than 8 elements
+     * @param daysMap Map of <[DayOfWeek], [TimetableDay]>. MUST contain at least six elements (days) AND less than 8 elements
      *
-     * @throws IllegalArgumentException Thrown, if [daysArray] does not contain some day of week (except SUNDAY) OR it has less than six elements
+     * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
-    fun registerClassTimetable(classID: Int, daysArray: Array<TimetableDay>) {
-        if (daysArray.size < 6 || daysArray.size > 7)
+    fun registerClassTimetable(classID: Int, daysMap: Map<DayOfWeek, TimetableDay>) {
+        if (daysMap.size < 6 || daysMap.size > 7) {
+            println(Json.encodeToString(daysMap))
             throw IllegalArgumentException("daysArray size is less than six OR more than 7")
-        val map = mutableMapOf<DayOfWeek, Array<Lesson>>()
-        daysArray.forEach {
-            map[it.dayOfWeek] = it.lessonsArray
         }
         for (i in 0 until 6) {
             when (i) {
                 DayOfWeek.MONDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.MONDAY))
+                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
                         throw IllegalArgumentException("daysArray does not contain Monday")
                 }
                 DayOfWeek.TUESDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.TUESDAY))
+                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
                         throw IllegalArgumentException("daysArray does not contain Tuesday")
                 }
                 DayOfWeek.WEDNESDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.WEDNESDAY))
+                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
                         throw IllegalArgumentException("daysArray does not contain Wednesday")
                 }
                 DayOfWeek.THURSDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.THURSDAY))
+                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
                         throw IllegalArgumentException("daysArray does not contain Thursday")
                 }
                 DayOfWeek.FRIDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.FRIDAY))
+                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
                         throw IllegalArgumentException("daysArray does not contain Friday")
                 }
                 DayOfWeek.SATURDAY.ordinal -> {
-                    if (!map.containsKey(DayOfWeek.SATURDAY))
+                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
                         throw IllegalArgumentException("daysArray does not contain Saturday")
                 }
             }
@@ -183,12 +210,12 @@ object EversityDatabase {
         transaction {
             ClassTimetables.insert {
                 it[id] = classID
-                it[monday] = Json.encodeToString(map[DayOfWeek.MONDAY])
-                it[tuesday] = Json.encodeToString(map[DayOfWeek.TUESDAY])
-                it[wednesday] = Json.encodeToString(map[DayOfWeek.WEDNESDAY])
-                it[thursday] = Json.encodeToString(map[DayOfWeek.THURSDAY])
-                it[friday] = Json.encodeToString(map[DayOfWeek.FRIDAY])
-                it[saturday] = Json.encodeToString(map[DayOfWeek.SATURDAY])
+                it[monday] = Json.encodeToString(daysMap[DayOfWeek.MONDAY])
+                it[tuesday] = Json.encodeToString(daysMap[DayOfWeek.TUESDAY])
+                it[wednesday] = Json.encodeToString(daysMap[DayOfWeek.WEDNESDAY])
+                it[thursday] = Json.encodeToString(daysMap[DayOfWeek.THURSDAY])
+                it[friday] = Json.encodeToString(daysMap[DayOfWeek.FRIDAY])
+                it[saturday] = Json.encodeToString(daysMap[DayOfWeek.SATURDAY])
             }
         }
         return
@@ -228,6 +255,7 @@ object EversityDatabase {
                 it[token] = issuedToken
             }
         }
+        validTokensList.add(Triple(userID, issuedToken, DateTime.now()))
         return issuedToken
     }
 
@@ -239,7 +267,7 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if no user with such ID is registered
      */
     fun invalidateTokens(userID: Int, reason: String?): Int {
-        if (doesUserExist(userID))
+        if (!doesUserExist(userID))
             throw IllegalArgumentException("Database does not contain user with such user ID ($userID)")
         val tokensToInvalidate = transaction {
             Tokens.select {
@@ -255,9 +283,13 @@ object EversityDatabase {
                 BannedTokens.insert {
                     it[BannedTokens.userID] = userID
                     it[token] = res[Tokens.token]
+                    it[banDate] = DateTime.now()
                     it[BannedTokens.reason] = reason ?: "Unknown"
                 }
             }
+        }
+        validTokensList.removeIf {
+            it.first == userID
         }
         return invalidationSize
     }
@@ -270,6 +302,12 @@ object EversityDatabase {
      * @return If token is found and it is not banned, returns (true, null). If token is found, but it is banned, returns (false, reason of ban). If token is not found, returns (false,null).
      */
     fun checkToken(userID: Int, token: String): Pair<Boolean, String?> {
+        if (validTokensList.find {
+                it.first == userID && it.second == token && Hours.hoursBetween(it.third, DateTime.now())
+                    .isLessThan(Hours.hours(1))
+            } != null) {
+            return Pair(true, null)
+        }
         val foundInValid = transaction {
             Tokens.select {
                 Tokens.userID eq userID
@@ -277,6 +315,7 @@ object EversityDatabase {
             }.toList().isNotEmpty()
         }
         if (foundInValid) {
+            validTokensList.add(Triple(userID, token, DateTime.now()))
             return Pair(true, null)
         }
         val foundBanned = transaction {
@@ -290,5 +329,213 @@ object EversityDatabase {
         val banReason = foundBanned.firstOrNull() ?: return Pair(false, null)
         //TODO: Add logging
         return Pair(false, banReason.getOrNull(BannedTokens.reason))
+    }
+
+    private fun registerUser(userID: Int, type: String) {
+        transaction {
+            Users.insert {
+                it[id] = userID
+                it[Users.type] = type
+            }
+        }
+    }
+
+    /**
+     * Obtains user credentials from database
+     *
+     * @param userID ID of user to get credentials
+     * @return Triple, made of (csrftoken?, sessionid?, APIToken)
+     * @throws IllegalArgumentException Thrown, if user is not found
+     * @throws NoSuchElementException Thrown, if no credentials were found OR they are outdated (in any of cases, you are required to re-register credentials)
+     * @throws IllegalStateException Thrown, if more than two credentials sets have been found
+     */
+    fun obtainCredentials(userID: Int): Triple<String?, String?, String> {
+        if (!doesUserExist(userID)) {
+            throw IllegalArgumentException("Credentials not found for user ID $userID")
+        }
+        val credentialsList = transaction {
+            Credentials.select {
+                Credentials.id eq userID
+            }.toList()
+        }
+        if (credentialsList.size > 1) {
+            //TODO: Notify system administrator to check database consistency
+            throw IllegalArgumentException("More than one set of credentials have been found")
+        }
+        if (credentialsList.isEmpty()) {
+            throw NoSuchElementException("Credentials list for user ID $userID is empty")
+        }
+        val credentials =
+            credentialsList.firstOrNull() ?: throw NoSuchElementException("Credentials first element is null")
+        return Triple(
+            credentials[Credentials.csrfToken],
+            credentials[Credentials.sessionID],
+            credentials[Credentials.token]
+        )
+    }
+
+    /**
+     * Saves (or updates existing) credentials for given user ID.
+     *
+     * @param userID ID of user
+     * @param credentials Triple, containing (csrftoken?, sessionid?, APItoken)
+     * @throws IllegalArgumentException Thrown, if user does not exist
+     */
+    fun insertOrUpdateCredentials(userID: Int, credentials: Triple<String?, String?, String>) {
+        if (!doesUserExist(userID)) {
+            throw IllegalArgumentException("User does not exist!")
+        }
+        val deletedCredentials = transaction {
+            Credentials.deleteWhere {
+                Credentials.id eq userID
+            }
+        }
+        //TODO: Add logging
+        transaction {
+            Credentials.insert {
+                it[id] = userID
+                it[csrfToken] = credentials.first
+                it[sessionID] = credentials.second
+                it[token] = credentials.third
+            }
+        }
+    }
+
+    /**
+     * Registers (or, updates) school class (does not register class teacher, pupils, timetables etc.)
+     *
+     * @param classID ID of class
+     * @param classTeacherID ID of class teacher (does not need to be registered)
+     */
+    fun registerClass(classID: Int, classTeacherID: Int) {
+        if (doesClassExist(classID))
+            return
+        transaction {
+            Classes.insert {
+                it[this.classID] = classID
+                it[this.classTeacher] = classTeacherID
+            }
+        }
+        return
+    }
+
+    /**
+     * Registers (or, overwrites, if exists) timetable for teacher
+     *
+     * @param teacherID ID of pupil
+     * @param daysMap Map of <[DayOfWeek], [TimetableDay]>. MUST contain at least six elements (days) AND less than 8 elements
+     *
+     * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
+     */
+    fun registerTeacherTimetable(teacherID: Int, daysMap: Map<DayOfWeek, Array<TeacherLesson>>) {
+        for (i in 0 until 6) {
+            when (i) {
+                DayOfWeek.MONDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
+                        throw IllegalArgumentException("daysArray does not contain Monday")
+                }
+                DayOfWeek.TUESDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
+                        throw IllegalArgumentException("daysArray does not contain Tuesday")
+                }
+                DayOfWeek.WEDNESDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
+                        throw IllegalArgumentException("daysArray does not contain Wednesday")
+                }
+                DayOfWeek.THURSDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
+                        throw IllegalArgumentException("daysArray does not contain Thursday")
+                }
+                DayOfWeek.FRIDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
+                        throw IllegalArgumentException("daysArray does not contain Friday")
+                }
+                DayOfWeek.SATURDAY.ordinal -> {
+                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
+                        throw IllegalArgumentException("daysArray does not contain Saturday")
+                }
+            }
+        }
+        transaction {
+            TeachersTimetable.insert {
+                it[id] = teacherID
+                it[monday] = Json.encodeToString(daysMap[DayOfWeek.MONDAY])
+                it[tuesday] = Json.encodeToString(daysMap[DayOfWeek.TUESDAY])
+                it[wednesday] = Json.encodeToString(daysMap[DayOfWeek.WEDNESDAY])
+                it[thursday] = Json.encodeToString(daysMap[DayOfWeek.THURSDAY])
+                it[friday] = Json.encodeToString(daysMap[DayOfWeek.FRIDAY])
+                it[saturday] = Json.encodeToString(daysMap[DayOfWeek.SATURDAY])
+            }
+        }
+    }
+
+    /**
+     * Determines, whether you should update class data
+     * @param classID ID of class
+     * @return True, if you SHOULD (!) update class data. False otherwise
+     */
+    fun shouldUpdateClass(classID: Int): Boolean {
+        val classExisting = doesClassExist(classID)
+        val existingPupils = transaction {
+            Pupils.select {
+                Pupils.classID eq classID
+            }.toList().isNotEmpty()
+        }
+        val existingTimetable = transaction {
+            ClassTimetables.select {
+                ClassTimetables.id eq classID
+            }.toList().isNotEmpty()
+        }
+        if (classExisting) {
+            if (existingPupils) {
+                if (existingTimetable)
+                    return false
+            }
+        }
+        return true
+    }
+
+    fun getUserType(userID: Int): APIUserType {
+        val type = transaction {
+            Users.select {
+                Users.id eq userID
+            }.toList().firstOrNull()
+        } ?: throw UserNotRegistered("User with ID $userID not found in database.")
+        return APIUserType.valueOf(type[Users.type])
+    }
+
+    fun isTimetableValid(userID: Int): Boolean {
+        if (!doesUserExist(userID))
+            throw IllegalArgumentException()
+        return when (getUserType(userID)) {
+            APIUserType.Teacher -> {
+                transaction {
+                    TeachersTimetable.select {
+                        TeachersTimetable.id eq userID
+                    }.toList().isNotEmpty()
+                }
+            }
+            APIUserType.Pupil -> {
+                false
+            }
+            else -> {
+                false
+            }
+        }
+    }
+
+    fun getPupilClass(userID: Int): Int {
+        if (!doesUserExist(userID)) {
+            throw IllegalArgumentException("User with ID $userID not found in database.")
+        }
+        val user = transaction {
+            Users.select {
+                Users.id eq userID
+            }.toList().firstOrNull()
+        } ?: throw IllegalArgumentException("User with ID $userID not found in database.")
+        //TODO: Make this done.
+        TODO("To be implemented in v0.0.2")
+//        if(user[Users.type] != "Pupil")
+        return 5
     }
 }

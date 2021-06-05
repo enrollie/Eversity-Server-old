@@ -30,11 +30,11 @@ open class EversityJWT private constructor(secret: String) {
      *
      * @return String, made of JWT
      */
-    fun sign(userId: String, token: String): String = JWT
+    fun sign(userID: String, token: String): String = JWT
         .create()
         .withIssuer(ISSUER)
         .withAudience(AUDIENCE)
-        .withClaim(ClAIM_USERID, userId)
+        .withClaim(ClAIM_USERID, userID)
         .withClaim(CLAIM_TOKEN, token)
         .sign(algorithm)
 
@@ -52,7 +52,7 @@ open class EversityJWT private constructor(secret: String) {
 
         private const val ISSUER = "Enrollie-EversityJWT"
         private const val AUDIENCE = "Enrollie/EversityJWT"
-        const val ClAIM_USERID = "userId"
+        const val ClAIM_USERID = "userID"
         const val CLAIM_TOKEN = "token"
     }
 }

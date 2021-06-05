@@ -1,0 +1,392 @@
+{
+  "MONDAY": {
+    "dayOfWeek": "MONDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Белорусский язык",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "История Беларуси",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Английский язык",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "Математика",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Белорусская литература",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  },
+  "TUESDAY": {
+    "dayOfWeek": "TUESDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Русский язык",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "Химия",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Всемирная История",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "Трудовое обучение",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Математика",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Русская литература",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  },
+  "WEDNESDAY": {
+    "dayOfWeek": "WEDNESDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Биология",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "Физическая культура и здоровье",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Физика",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "Английский язык",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Математика",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Русский язык",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  },
+  "THURSDAY": {
+    "dayOfWeek": "THURSDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Обществоведение",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "Информатика",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Математика",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "Белорусский язык",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Белорусская литература",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Английский язык",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  },
+  "FRIDAY": {
+    "dayOfWeek": "FRIDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Всемирная История",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "Физическая культура и здоровье",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Физика",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "География",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Математика",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Химия",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  },
+  "SATURDAY": {
+    "dayOfWeek": "SATURDAY",
+    "lessonsArray": [
+      {
+        "place": 1,
+        "name": "Белорусский язык",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        }
+      },
+      {
+        "place": 2,
+        "name": "История Беларуси",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        }
+      },
+      {
+        "place": 3,
+        "name": "Английский язык",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        }
+      },
+      {
+        "place": 4,
+        "name": "Математика",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        }
+      },
+      {
+        "place": 5,
+        "name": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        }
+      },
+      {
+        "place": 6,
+        "name": "Белорусская литература",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        }
+      }
+    ]
+  }
+}

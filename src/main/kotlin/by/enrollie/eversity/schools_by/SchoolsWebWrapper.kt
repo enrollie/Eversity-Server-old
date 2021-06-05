@@ -7,19 +7,26 @@
 
 package by.enrollie.eversity.schools_by
 
-import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.configSubdomainURL
+import by.enrollie.eversity.data_classes.*
+import by.enrollie.eversity.data_functions.russianDayNameToDayOfWeek
+import by.enrollie.eversity.data_functions.toTimeConstraint
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
+import io.ktor.features.*
 import io.ktor.http.*
+import io.ktor.util.*
 import it.skrape.core.htmlDocument
 import it.skrape.exceptions.ElementNotFoundException
-import it.skrape.selects.html5.a
-import it.skrape.selects.html5.div
-import it.skrape.selects.html5.form
+import it.skrape.selects.forEachLink
+import it.skrape.selects.html5.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.exposedLogger
 
 
 /**
@@ -27,7 +34,7 @@ import it.skrape.selects.html5.form
  * @author Pavel Matusevich
  */
 class SchoolsWebWrapper {
-    private val userAgent = "Educad/1.0 (Windows NT 10.0; Win32; x86; rv:1.0) KTor/1.5.4 Educad/1.0"
+    private val userAgent = "Eversity/1.0 (Windows NT 10.0; Win32; x86; rv:1.0) KTor/1.5.4 Eversity/1.0"
 
     private var subdomainURL: String = "https://demo.schools.by/"
     private var schoolsBYCookies: Pair<String, String> = Pair("", "")
@@ -51,7 +58,7 @@ class SchoolsWebWrapper {
      * @constructor Constructs wrapper class without initializing cookies and subdomain
      */
     constructor() {
-        subdomainURL = "https://demo.schools.by/"
+        subdomainURL = configSubdomainURL ?: "https://demo.schools.by/"
         schoolsBYCookies = Pair("", "")
     }
 
@@ -78,6 +85,14 @@ class SchoolsWebWrapper {
     }
 
     /**
+     * To be used only for testing. Sets default HttpClient to given one
+     * @param httpClient Mock http client
+     */
+    constructor(httpClient: HttpClient) {
+        client = httpClient
+    }
+
+    /**
      * Gets Schools.by login cookies and subdomain page.
      * Asserts, that login data is correct. To check it, refer to [SchoolsAPIClient.getAPIToken].
      *
@@ -90,30 +105,34 @@ class SchoolsWebWrapper {
      * @throws NoSuchElementException Thrown, if any of cookies is not found
      */
     suspend fun login(username: String, password: String): Pair<String, String> {
-        val baseCSRFresponse = client.get<HttpResponse>("https://schools.by/login") {
-            headers.append(HttpHeaders.UserAgent, userAgent)
-            userAgent(userAgent)
+        val baseCSRFresponse = HttpClient().use {
+            it.get<HttpResponse>("https://schools.by/login") {
+                headers.append(HttpHeaders.UserAgent, userAgent)
+                userAgent(userAgent)
+            }
         }
         var csrfTokenCookie = baseCSRFresponse.setCookie().find { it.name == "csrftoken" }
             ?: throw NoSuchElementException("CSRFToken not found after baseCSRFresponse")
         var csrfToken = csrfTokenCookie.value
-        val finalCSRFresponse: HttpResponse = client.config {
-            followRedirects = false
-        }.submitForm(
-            url = "https://schools.by/login",
-            formParameters = Parameters.build {
-                append("csrfmiddlewaretoken", csrfToken)
-                append("username", username)
-                append("password", password)
+        val finalCSRFresponse: HttpResponse =
+            HttpClient() {
+                followRedirects = false
+                expectSuccess = false
+            }.use {
+                it.submitForm(
+                    url = "https://schools.by/login",
+                    formParameters = Parameters.build {
+                        append("csrfmiddlewaretoken", csrfToken)
+                        append("username", username)
+                        append("password", password)
+                    }
+                ) {
+                    cookie("csrftoken", csrfToken)
+                    cookie("slc_cookie", "%7BslcMakeBetter%7D")
+                    header(HttpHeaders.Referrer, subdomainURL)
+                    header(HttpHeaders.UserAgent, userAgent)
+                }
             }
-        ) {
-            cookie("csrftoken", csrfToken)
-            cookie("slc_cookie", "%7BslcMakeBetter%7D")
-            header(HttpHeaders.Referrer, subdomainURL)
-            header(HttpHeaders.UserAgent, userAgent)
-        }
-        println(finalCSRFresponse.call.request.content.contentType)
-
         csrfTokenCookie = finalCSRFresponse.setCookie().find { it.name == "csrftoken" } ?: throw NoSuchElementException(
             "CSRFToken not found after finalCSRFresponse"
         )
@@ -140,11 +159,10 @@ class SchoolsWebWrapper {
      *
      * @return true if cookies are valid, false otherwise
      */
-    suspend fun checkCookies(cookies: Pair<String, String>? = null, changeInternal: Boolean = true): Boolean {
-        TODO("FIX THIS! GIVES WRONG RESULT!")
+    suspend fun validateCookies(cookies: Pair<String, String>? = null, changeInternal: Boolean = true): Boolean {
         val response = HttpClient().use {
-            return@use it.request<HttpResponse> {
-                url.takeFrom("${subdomainURL}teachers")
+            it.request<HttpResponse> {
+                url.takeFrom(subdomainURL)
                 method = HttpMethod.Get
                 cookie("csrftoken", cookies?.first ?: schoolsBYCookies.first)
                 cookie("sessionid", cookies?.second ?: schoolsBYCookies.second)
@@ -154,7 +172,7 @@ class SchoolsWebWrapper {
             val html = response.receive<String>()
             htmlDocument(html) {
                 form {
-                    withAttribute = Pair("method", "post")
+                    withAttribute = Pair("action", "https://schools.by/login")
                     findAll {
                         //If found, cookies are not valid. Will return false at end.
                     }
@@ -167,6 +185,12 @@ class SchoolsWebWrapper {
         } catch (e: ElementNotFoundException) {
             if (changeInternal && cookies != null) {
                 schoolsBYCookies = cookies
+                client = client.config {
+                    defaultRequest {
+                        cookie("csrftoken", schoolsBYCookies.first)
+                        cookie("sessionid", schoolsBYCookies.second)
+                    }
+                }
             }
             return true //Login form not found => we are logged in.
         }
@@ -174,22 +198,21 @@ class SchoolsWebWrapper {
     }
 
     /**
-     *Only for use with teacher's account. Returns unsorted array of [Pupil].
+     * Returns unsorted array of [Pupil] for given class.
      *
      * @param classID ID of needed class
      *
      * @return [Array] of [Pupil] from given [classID]
      * @throws IllegalArgumentException Thrown, if no pupils found.
      */
-    suspend fun getPupilsArray(classID: Int): Array<Pupil> {
+    suspend fun fetchPupilsArray(classID: Int): Array<Pupil> {
         val response = client.request<HttpResponse> {
-            url.takeFrom("$subdomainURL/class/$classID")
+            url.takeFrom("${subdomainURL}class/$classID/pupils")
             method = HttpMethod.Get
         }
         val pageString = response.receive<String>()
         var pupilsArray = arrayOf<Pupil>()
         var pupilsCounter = 1
-
         try {
             htmlDocument(pageString) {
                 div {
@@ -213,6 +236,7 @@ class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
+            exposedLogger.error(e)
             throw IllegalArgumentException()
         }
         return pupilsArray
@@ -224,24 +248,27 @@ class SchoolsWebWrapper {
      * @param classID ID of needed class
      *
      * @return [Array] of [Pupil] from given [classID]
-     * @throws IllegalArgumentException Thrown, if no pupils found.
+     * @throws IllegalArgumentException Thrown, if no class teacher is not found.
      */
-    suspend fun getClassTeacher(classID: Int): Int {
+    suspend fun fetchClassForTeacher(classID: Int): Int {
         val response = client.request<HttpResponse> {
             url.takeFrom("$subdomainURL/class/$classID")
             method = HttpMethod.Get
         }
         val pageString = response.receive<String>()
-        var classTeacherID: Int
+        var classTeacherID: Int = -1
 
         try {
             htmlDocument(pageString) {
                 div {
                     withClass = "r_user_info"
-                    findAll {
+                    p {
+                        withClass = "name"
                         a {
                             findFirst {
-                                classTeacherID = this.attribute("href").removePrefix("/teacher/").toInt()
+                                classTeacherID =
+                                    this.attribute("href").replaceBefore("/teacher/", "").removePrefix("/teacher/")
+                                        .toInt()
                             }
                         }
                     }
@@ -250,5 +277,218 @@ class SchoolsWebWrapper {
         } catch (e: ElementNotFoundException) {
             throw IllegalArgumentException()
         }
+        return classTeacherID
+    }
+
+    /**
+     * Fetches class timetable
+     *
+     * @param classID ID of class
+     * @return Map <[DayOfWeek], [TimetableDay]>, containing all work days (from Monday to Saturday)
+     * @throws NotFoundException Thrown, if Schools.by returned 404 code (usually, class ID is invalid)
+     */
+    suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, TimetableDay> {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("$subdomainURL/class/$classID/timetable")
+            method = HttpMethod.Get
+            expectSuccess = false
+        }
+        if (response.status == HttpStatusCode.NotFound) {
+            throw NotFoundException("Timetable of class with class ID $classID not found.")
+        }
+        val pageString = response.receive<String>()
+        val timetableMap = mutableMapOf<DayOfWeek, TimetableDay>()
+        try {
+            htmlDocument(pageString) {
+                div {
+                    withClass = "ttb_boxes"
+                    div {
+                        withClass = "ttb_box"
+                        findAll {
+                            forEachIndexed { _, mainDiv ->
+                                val day =
+                                    russianDayNameToDayOfWeek(mainDiv.div {
+                                        withClass = "ttb_day"; findFirst { ownText }
+                                    })
+                                var dayTimetable = arrayOf<Lesson>()
+                                mainDiv.tbody {
+                                    tr {
+                                        findAll {
+                                            forEachIndexed { _, doc ->
+                                                var add = true
+                                                val num =
+                                                    doc.td { withClass = "num"; findFirst { ownText } }.dropLast(1)
+                                                        .toInt()
+                                                val time =
+                                                    doc.td { withClass = "time"; findFirst { ownText } }
+                                                        .toTimeConstraint()
+                                                        ?: TimeConstraints(0, 0, 0, 0)
+                                                val name = doc.td {
+                                                    val titles = mutableListOf<String>()
+                                                    withClass = "subjs"; findFirst {
+                                                    try {
+                                                        a {
+                                                            findAll {
+                                                                forEach { doc ->
+                                                                    if (!titles.contains(doc.attribute("title")))
+                                                                        titles.add(doc.attribute("title"))
+                                                                }
+                                                            }
+                                                        }
+                                                    } catch (e: ElementNotFoundException) {
+                                                        try {
+                                                            span {
+                                                                findAll {
+                                                                    forEach { doc ->
+                                                                        if (!titles.contains(doc.attribute("title")))
+                                                                            titles.add(doc.attribute("title"))
+                                                                    }
+                                                                }
+                                                            }
+                                                        } catch (e: ElementNotFoundException) {
+                                                            add = false
+                                                        }
+                                                    }
+                                                }
+                                                    return@td titles.joinToString(" / ")
+                                                }
+                                                if (add)
+                                                    dayTimetable += Lesson(num, name, time)
+                                            }
+                                        }
+                                    }
+                                }
+                                timetableMap[day] = TimetableDay(day, dayTimetable)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+            e.printStackTrace()
+        }
+        return timetableMap
+    }
+
+    /**
+     * Gets class string for current teacher.
+     * @return String, containing URL to class
+     */
+    suspend fun fetchClassForCurrentUser(): Int? {
+        val response = HttpClient {
+            followRedirects = true
+        }.use {
+            it.request<HttpResponse> {
+                cookie("csrftoken", schoolsBYCookies.first)
+                cookie("sessionid", schoolsBYCookies.second)
+                url.takeFrom("https://schools.by/login")
+                method = HttpMethod.Get
+            }
+        }
+
+        val pageString = response.receive<String>()
+        var classID: Int? = null
+        try {
+            htmlDocument(pageString) {
+                div {
+                    withClass = "pp_line"
+                    findAll {
+                        a {
+                            withAttributeKey = "href"
+                            findAll {
+                                forEachLink { _, url ->
+                                    if (url.contains(".schools.by/class/")) {
+                                        classID = url.replaceBeforeLast('/', "").drop(1).toInt()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+            return null
+        }
+        return classID
+    }
+
+    /**
+     * Fetches teacher timetable
+     * @param userID ID of teacher
+     * @return Map<DayOfWeek, TimetableDay>
+     * @throws IllegalArgumentException Thrown, if
+     */
+    suspend fun fetchTeacherTimetable(userID: Int): Map<DayOfWeek, Array<TeacherLesson>> {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("${subdomainURL}teacher/$userID/timetable")
+            method = HttpMethod.Get
+        }
+        val pageString = response.receive<String>()
+        val timetableMap = mutableMapOf<DayOfWeek, Array<TeacherLesson>>()
+        for (i in 0..5) {
+            timetableMap[DayOfWeek.values()[i]] = arrayOf()
+        }
+
+        var table = arrayOf<Array<TeacherLesson?>>()
+        try {
+            htmlDocument(pageString) {
+                table {
+                    tbody {
+                        tr {
+                            findAll {
+                                forEachIndexed { lessonIndex, mainDoc ->
+                                    val timeConstraints =
+                                        mainDoc.td { withClass = "bells"; findFirst { ownText } }.toTimeConstraint()
+                                            ?: TimeConstraints(0, 0, 0, 0)
+                                    table += arrayOfNulls(6)
+                                    mainDoc.td {
+                                        findAll {
+                                            this.filter {
+                                                it.className != "bells" && it.className != "num"
+                                            }.forEachIndexed { dayIndex, docElement ->
+                                                if (docElement.ownText.isEmpty()) {
+                                                    docElement.div {
+                                                        withClass = "lesson"
+                                                        findFirst {
+                                                            val name = try {
+                                                                b { findFirst { ownText } }
+                                                            } catch (e: ElementNotFoundException) {
+                                                                a { withClass = "subject"; findFirst { ownText } }
+                                                            }
+                                                            val classID =
+                                                                span { a { findFirst { eachHref.firstOrNull() } } }?.removePrefix(
+                                                                    "/class/"
+                                                                )?.toInt() ?: 0
+
+                                                            table[lessonIndex][dayIndex] = TeacherLesson(
+                                                                place = lessonIndex.toShort(),
+                                                                name = name,
+                                                                schedule = timeConstraints,
+                                                                classID = classID
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+            return timetableMap
+        }
+        table.forEachIndexed { _, arr ->
+            arr.forEachIndexed { dayNum, it ->
+                if (it != null) {
+                    timetableMap[DayOfWeek.values()[dayNum]] =
+                        timetableMap[DayOfWeek.values()[dayNum]]?.plus(it) ?: arrayOf()
+                }
+            }
+        }
+        return timetableMap
     }
 }
