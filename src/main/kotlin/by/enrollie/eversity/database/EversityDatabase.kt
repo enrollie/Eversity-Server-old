@@ -10,12 +10,14 @@ package by.enrollie.eversity.database
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.tables.*
 import by.enrollie.eversity.exceptions.UserNotRegistered
+import by.enrollie.eversity.tokenCacheValidityMinutes
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 import org.joda.time.Hours
+import org.joda.time.Minutes
 import java.util.*
 import kotlin.NoSuchElementException
 
@@ -109,10 +111,6 @@ object EversityDatabase {
             throw IllegalArgumentException("Class with ID $classID does not yet exist. Pupil with ID $userID cannot be registered.")
         }
         registerUser(userID, APIUserType.Pupil.name)
-        if (!doesUserExist(userID)) {
-            //TODO: Log this
-            throw UnknownError("registerUser() was called, but user does not exist.")
-        }
         transaction {
             Pupils.insert {
                 it[id] = userID
@@ -144,7 +142,7 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
     fun registerClassTimetable(classID: Int, daysMap: Map<DayOfWeek, TimetableDay>) {
-        if (!validateDaysMap(daysMap)){
+        if (!validateDaysMap(daysMap)) {
             throw IllegalArgumentException("daysMap is not valid.")
         }
         transaction {
@@ -243,8 +241,10 @@ object EversityDatabase {
      */
     fun checkToken(userID: Int, token: String): Pair<Boolean, String?> {
         if (validTokensList.find {
-                it.first == userID && it.second == token && Hours.hoursBetween(it.third, DateTime.now())
-                    .isLessThan(Hours.hours(1))
+                it.first == userID && it.second == token && Minutes.minutesBetween(
+                    it.third,
+                    DateTime.now()
+                ).minutes <= tokenCacheValidityMinutes
             } != null) {
             return Pair(true, null)
         }
@@ -258,17 +258,8 @@ object EversityDatabase {
             validTokensList.add(Triple(userID, token, DateTime.now()))
             return Pair(true, null)
         }
-        val foundBanned = transaction {
-            BannedTokens.select {
-                BannedTokens.token eq token
-            }.toList()
-        }
-        if (foundBanned.isEmpty()) {
-            return Pair(false, null)
-        }
-        val banReason = foundBanned.firstOrNull() ?: return Pair(false, null)
-        //TODO: Add logging
-        return Pair(false, banReason.getOrNull(BannedTokens.reason))
+        return Pair(false, null)
+        //TODO: Add getBanReason() or something like that
     }
 
     private fun registerUser(userID: Int, type: String) {
@@ -297,10 +288,6 @@ object EversityDatabase {
             Credentials.select {
                 Credentials.id eq userID
             }.toList()
-        }
-        if (credentialsList.size > 1) {
-            //TODO: Notify system administrator to check database consistency
-            throw IllegalArgumentException("More than one set of credentials have been found")
         }
         if (credentialsList.isEmpty()) {
             throw NoSuchElementException("Credentials list for user ID $userID is empty")
@@ -368,7 +355,7 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
     fun registerTeacherTimetable(teacherID: Int, daysMap: Map<DayOfWeek, Array<TeacherLesson>>) {
-        if (!validateDaysMap(daysMap)){
+        if (!validateDaysMap(daysMap)) {
             throw IllegalArgumentException("daysMap is not valid.")
         }
         transaction {
@@ -450,40 +437,14 @@ object EversityDatabase {
         } ?: throw IllegalArgumentException("User with ID $userID not found in database.")
         //TODO: Make this done.
         TODO("To be implemented in v0.0.2")
-//        if(user[Users.type] != "Pupil")
-        return 5
     }
 
-    private fun validateDaysMap(daysMap: Map<DayOfWeek, Any>):Boolean{
+    private fun validateDaysMap(daysMap: Map<DayOfWeek, Any>): Boolean {
         if (daysMap.size !in 6..7)
             return false
         for (i in 0 until 6) {
-            when (i) {
-                DayOfWeek.MONDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.MONDAY))
-                        return false
-                }
-                DayOfWeek.TUESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.TUESDAY))
-                        return false
-                }
-                DayOfWeek.WEDNESDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.WEDNESDAY))
-                        return false
-                }
-                DayOfWeek.THURSDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.THURSDAY))
-                        return false
-                }
-                DayOfWeek.FRIDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.FRIDAY))
-                        return false
-                }
-                DayOfWeek.SATURDAY.ordinal -> {
-                    if (!daysMap.containsKey(DayOfWeek.SATURDAY))
-                        return false
-                }
-            }
+            if (!daysMap.containsKey(DayOfWeek.values()[i]))
+                return false
         }
         return true
     }

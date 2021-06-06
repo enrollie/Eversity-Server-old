@@ -146,8 +146,7 @@ class AuthController {
             }
         } catch (e: IllegalArgumentException) {
             logger.error(e)
-            logger.error(UnknownError("EversityDatabase.doesUserExist() returned true, but .obtainCredentials() thrown IllegalArgumentException"))
-            throw UnknownError("EversityDatabase.doesUserExist() returned true, but .obtainCredentials() thrown IllegalArgumentException")
+            throw UnknownError()
         } catch (e: NoSuchElementException) {
             val newCredentials = schoolsWeb.login(username, password)
             EversityDatabase.insertOrUpdateCredentials(

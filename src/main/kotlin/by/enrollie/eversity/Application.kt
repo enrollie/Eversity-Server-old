@@ -45,6 +45,8 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: () -> Unit) =
     }
 
 public var configSubdomainURL: String? = null
+public var tokenCacheValidityMinutes: Int = 60
+
 fun main(args: Array<String>): Unit =
     io.ktor.server.netty.EngineMain.main(args)
 
@@ -72,7 +74,7 @@ fun Application.module(testing: Boolean = false) {
     val user = this.environment.config.config("database").property("user").getString()
     val password = this.environment.config.config("database").property("password").getString()
     initDatabase(host, port, databaseName, user, password)
-    val tokenCacheValidityMinutes =
+    tokenCacheValidityMinutes =
         environment.config.config("eversity").property("tokenCacheLifetime").getString().toInt()
 
     configSubdomainURL = environment.config.config("schools").propertyOrNull("subdomain")?.getString()
