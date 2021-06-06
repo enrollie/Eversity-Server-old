@@ -120,6 +120,7 @@ fabric.properties
 
 # Package Files #
 *.jar
+!ktor-banner.jar
 *.war
 *.nar
 *.ear
