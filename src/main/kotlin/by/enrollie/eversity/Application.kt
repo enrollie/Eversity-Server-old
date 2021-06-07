@@ -15,12 +15,13 @@ import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import io.ktor.application.*
-import by.enrollie.eversity.routes.registerPupilsRouting
 import by.enrollie.eversity.routes.registerAuthRoute
 import by.enrollie.eversity.security.EversityJWT
-import io.ktor.config.*
 import io.ktor.features.*
 import io.ktor.gson.*
+import io.ktor.http.*
+import io.ktor.response.*
+import io.ktor.routing.*
 import io.ktor.serialization.*
 import kotlinx.coroutines.*
 import org.joda.time.DateTime
@@ -81,7 +82,13 @@ fun Application.module(testing: Boolean = false) {
     configureAuthentication()
     configureHTTP()
     registerAuthRoute()
-    registerPupilsRouting()
+    //TODO: Remove, when web client is done
+    routing {
+        get("/") {
+            return@get call.respondText(status = HttpStatusCode.Locked, text = "Web client is not ready yet. Check for updates on $EVERSITY_WEBSITE!")
+        }
+    }
+
     CoroutineScope(this.coroutineContext).launchPeriodicAsync(TimeUnit.MINUTES.toMillis(tokenCacheValidityMinutes.toLong())) {
         var removedCount = 0
         validTokensList.removeIf {

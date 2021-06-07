@@ -54,6 +54,7 @@ dependencies {
     implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.16.0")
     implementation("org.jetbrains.kotlinx:multik-api:$multikVersion")
+    implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation(files("libs/ktor-banner.jar"))
     //----END OF OTHER DEPENDENCIES
 
@@ -72,6 +73,10 @@ compileKotlin.kotlinOptions {
 val compileTestKotlin: KotlinCompile by tasks
 compileTestKotlin.kotlinOptions {
     jvmTarget = "1.8"
+}
+
+tasks.create("stage") {
+    dependsOn("installDist")
 }
 
 tasks.register<Jar>("uberJar") {

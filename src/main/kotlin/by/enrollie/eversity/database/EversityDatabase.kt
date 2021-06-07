@@ -439,6 +439,11 @@ object EversityDatabase {
         TODO("To be implemented in v0.0.2")
     }
 
+    /**
+     * Validates given dayMap to contain full timetable
+     * @param daysMap Map of days
+     * @return True, if timetable is valid. False otherwise
+     */
     private fun validateDaysMap(daysMap: Map<DayOfWeek, Any>): Boolean {
         if (daysMap.size !in 6..7)
             return false

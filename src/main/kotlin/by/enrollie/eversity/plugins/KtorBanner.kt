@@ -10,11 +10,16 @@ package by.enrollie.eversity.plugins
 import by.enrollie.eversity.EVERSITY_PUBLIC_NAME
 import by.enrollie.eversity.EVERSITY_WEBSITE
 import by.enrollie.eversity.main
+import com.github.ajalt.mordant.animation.animation
+import com.github.ajalt.mordant.animation.progressAnimation
+import com.github.ajalt.mordant.animation.textAnimation
+import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.application.*
 import team.yi.kfiglet.FigFont
 import team.yi.ktor.features.banner
 
-fun Application.configureBanner(){
+fun Application.configureBanner() {
     banner {
         bannerText = "Eversity Core"
         smushMode = 100
@@ -22,21 +27,18 @@ fun Application.configureBanner(){
             val inputStream = ::main.javaClass.classLoader.getResourceAsStream("slant.flf")
             FigFont.loadFigFont(inputStream)
         }
-        beforeBanner {banner->
-            val welcome = "    WORK IN PROGRESS VERSION    " //TODO: Remove after release
-            val filling = "".padStart(banner.width/2 - (welcome.length /2),'-') + welcome + "".padStart(banner.width/2 - (welcome.length /2),'-')
-            println(filling)
+        beforeBanner { banner ->
+            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
         }
         render {
-            println(it.text)
+            Terminal().println(TextColors.red(it.text))
         }
         afterBanner { banner ->
             val title = " $EVERSITY_PUBLIC_NAME "
             val homepage = " $EVERSITY_WEBSITE "
             val filling = "".padEnd(banner.width - title.length - homepage.length, ' ')
-
-            println("".padEnd(banner.width, '-'))
-            println("$title$filling$homepage")
+            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
+            Terminal().println(TextColors.brightBlue("$title$filling$homepage"))
         }
     }
 }
