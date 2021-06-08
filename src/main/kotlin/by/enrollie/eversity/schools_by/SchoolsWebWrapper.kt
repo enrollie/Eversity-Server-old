@@ -24,8 +24,6 @@ import it.skrape.core.htmlDocument
 import it.skrape.exceptions.ElementNotFoundException
 import it.skrape.selects.forEachLink
 import it.skrape.selects.html5.*
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.exposedLogger
 
 
@@ -115,7 +113,7 @@ class SchoolsWebWrapper {
             ?: throw NoSuchElementException("CSRFToken not found after baseCSRFresponse")
         var csrfToken = csrfTokenCookie.value
         val finalCSRFresponse: HttpResponse =
-            HttpClient() {
+            HttpClient {
                 followRedirects = false
                 expectSuccess = false
             }.use {

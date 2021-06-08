@@ -10,11 +10,8 @@ package by.enrollie.eversity.security
 import by.enrollie.eversity.data_classes.APIUserType
 import io.ktor.auth.*
 
-class User:Principal {
-    val id: Int
-    val type: APIUserType
-    constructor(ID:Int, userType: APIUserType){
-        type = userType
-        id = ID
-    }
+class User(ID: Int, userType: APIUserType, accessToken: String) :Principal {
+    val id: Int = ID
+    val type: APIUserType = userType
+    val token:String = accessToken
 }

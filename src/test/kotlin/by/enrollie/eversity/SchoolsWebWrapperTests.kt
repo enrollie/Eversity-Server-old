@@ -15,7 +15,6 @@ import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -26,7 +25,6 @@ import kotlin.test.assertEquals
 
 class SchoolsWebWrapperTests {
     private val testDataBasePath = "src/test/kotlin/by/enrollie/eversity/test_data/schoolsWeb"
-    private val validateCookiesData = Pair("csrftoken", "sessionid")
 
     private val client = HttpClient(MockEngine) {
         engine {

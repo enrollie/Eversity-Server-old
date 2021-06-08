@@ -5,26 +5,45 @@
  * All rights are reserved.
  */
 
+@file:Suppress("DuplicatedCode", "DuplicatedCode", "DuplicatedCode", "DuplicatedCode")
+
 package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.tables.*
 import by.enrollie.eversity.exceptions.UserNotRegistered
+import by.enrollie.eversity.security.User
 import by.enrollie.eversity.tokenCacheValidityMinutes
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.deleteWhere
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
-import org.joda.time.Hours
 import org.joda.time.Minutes
 import java.util.*
-import kotlin.NoSuchElementException
 
 /**
  * Temporary cache of valid access tokens.
  */
 var validTokensList = mutableListOf<Triple<Int, String, DateTime>>()
+
+/**
+ * Temporary cache for users (their types and ID's)
+ */
+private var usersCacheList = mutableListOf<Pair<User, DateTime>>()
+
+/**
+ * Temporary cache for pupils data
+ */
+private var pupilsCacheList = mutableListOf<Pair<Pupil, DateTime>>()
+
+/**
+ * Temporary cache for user's credentials
+ */
+private var credentialsCacheList = mutableListOf<Triple<Int, Pair<String?, String?>, String>>()
+
 
 /**
  * Interface to communicate with Eversity Database.
@@ -40,7 +59,6 @@ object EversityDatabase {
         val tos = transaction {
             Users.select { Users.id eq userID }.toList()
         }
-        println(tos.joinToString())
         return tos.isNotEmpty()
     }
 
@@ -166,7 +184,7 @@ object EversityDatabase {
      * @return [String], containing issued token
      */
     fun issueToken(userID: Int): String {
-        var issuedToken: String = ""
+        var issuedToken = ""
         run {
             var newToken: UUID
             while (1 in 1..1) { //making sure that generated token is not seen anywhere
@@ -204,7 +222,7 @@ object EversityDatabase {
      * @return Count of invalidated tokens
      * @throws IllegalArgumentException Thrown, if no user with such ID is registered
      */
-    fun invalidateTokens(userID: Int, reason: String?): Int {
+    fun invalidateAllTokens(userID: Int, reason: String?): Int {
         if (!doesUserExist(userID))
             throw IllegalArgumentException("Database does not contain user with such user ID ($userID)")
         val tokensToInvalidate = transaction {
@@ -284,6 +302,12 @@ object EversityDatabase {
         if (!doesUserExist(userID)) {
             throw IllegalArgumentException("Credentials not found for user ID $userID")
         }
+        val cachedCredentials = credentialsCacheList.find {
+            it.first == userID
+        }
+        if (cachedCredentials != null) {
+            return Triple(cachedCredentials.second.first, cachedCredentials.second.second, cachedCredentials.third)
+        }
         val credentialsList = transaction {
             Credentials.select {
                 Credentials.id eq userID
@@ -294,6 +318,14 @@ object EversityDatabase {
         }
         val credentials =
             credentialsList.firstOrNull() ?: throw NoSuchElementException("Credentials first element is null")
+        credentialsCacheList.add(
+            Triple(
+                userID, Pair(
+                    credentials[Credentials.csrfToken],
+                    credentials[Credentials.sessionID]
+                ), credentials[Credentials.token]
+            )
+        )
         return Triple(
             credentials[Credentials.csrfToken],
             credentials[Credentials.sessionID],
@@ -312,6 +344,9 @@ object EversityDatabase {
         if (!doesUserExist(userID)) {
             throw IllegalArgumentException("User does not exist!")
         }
+        credentialsCacheList.removeIf {
+            it.first == userID
+        }
         val deletedCredentials = transaction {
             Credentials.deleteWhere {
                 Credentials.id eq userID
@@ -326,6 +361,7 @@ object EversityDatabase {
                 it[token] = credentials.third
             }
         }
+        credentialsCacheList.add(Triple(userID, Pair(credentials.first, credentials.second), credentials.third))
     }
 
     /**
@@ -397,7 +433,19 @@ object EversityDatabase {
         return true
     }
 
+    /**
+     * Returns user's type
+     * @param userID User's ID
+     */
     fun getUserType(userID: Int): APIUserType {
+        val cachedUser = usersCacheList.find {
+            it.first.id == userID && Minutes.minutesBetween(
+                it.second,
+                DateTime.now()
+            ).minutes <= tokenCacheValidityMinutes
+        }
+        if (cachedUser != null)
+            return cachedUser.first.type
         val type = transaction {
             Users.select {
                 Users.id eq userID
@@ -406,37 +454,23 @@ object EversityDatabase {
         return APIUserType.valueOf(type[Users.type])
     }
 
-    fun isTimetableValid(userID: Int): Boolean {
-        if (!doesUserExist(userID))
-            throw IllegalArgumentException()
-        return when (getUserType(userID)) {
-            APIUserType.Teacher -> {
-                transaction {
-                    TeachersTimetable.select {
-                        TeachersTimetable.id eq userID
-                    }.toList().isNotEmpty()
-                }
-            }
-            APIUserType.Pupil -> {
-                false
-            }
-            else -> {
-                false
-            }
-        }
-    }
-
+    /**
+     * Returns pupil's class ID
+     *
+     * @param userID Pupil's ID
+     * @return Class ID
+     * @throws IllegalArgumentException Thrown, if user is not registered OR is not found in "Pupils" table
+     */
     fun getPupilClass(userID: Int): Int {
         if (!doesUserExist(userID)) {
             throw IllegalArgumentException("User with ID $userID not found in database.")
         }
-        val user = transaction {
-            Users.select {
-                Users.id eq userID
+        val classIDElement = transaction {
+            Pupils.select {
+                Pupils.id eq userID
             }.toList().firstOrNull()
-        } ?: throw IllegalArgumentException("User with ID $userID not found in database.")
-        //TODO: Make this done.
-        TODO("To be implemented in v0.0.2")
+        } ?: throw IllegalArgumentException("Pupil with ID $userID not found in Pupils table.")
+        return classIDElement[Pupils.classID]
     }
 
     /**
@@ -450,6 +484,35 @@ object EversityDatabase {
         for (i in 0 until 6) {
             if (!daysMap.containsKey(DayOfWeek.values()[i]))
                 return false
+        }
+        return true
+    }
+
+    /**
+     * Invalidates given user token
+     * @param userID User ID
+     * @param token Token to invalidate
+     * @param reason Reason of invalidation (if null, defaults to "Unknown")
+     * @return True, if token was banned. False, if user is not found.
+     */
+    fun invalidateSingleToken(userID: Int, token: String, reason: String?):Boolean {
+        if (!doesUserExist(userID)) {
+            return false
+        }
+        validTokensList.removeIf {
+            it.first == userID && it.second == token
+        }
+        transaction {
+            Tokens.deleteWhere {
+                Tokens.userID eq userID
+                Tokens.token eq token
+            }
+            BannedTokens.insert {
+                it[this.userID] = userID
+                it[this.token] = token
+                it[this.reason] = reason ?: "Unknown"
+                it[this.banDate] = DateTime.now()
+            }
         }
         return true
     }

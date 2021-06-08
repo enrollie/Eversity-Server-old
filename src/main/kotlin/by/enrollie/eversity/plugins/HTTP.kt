@@ -11,9 +11,6 @@ import io.ktor.application.*
 import io.ktor.features.*
 import io.ktor.http.*
 
-private const val ISSUER = "Enrollie-EversityJWT"
-private const val AUDIENCE = "Enrollie/EversityJWT"
-
 fun Application.configureHTTP() {
     install(DefaultHeaders) {
         header("X-Engine", "Ktor") // will send this header with each response

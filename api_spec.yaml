@@ -1,0 +1,102 @@
+openapi: 3.0.0
+info:
+  title: "Eversity Server"
+  description: "API documentation, which is the main way of interacting with Eversity"
+  version: 0.0.1
+servers:
+  - url: '{server}/api'
+    description: "Current server"
+    variables:
+      server:
+        default: http://127.0.0.1:8080
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    LoginData:
+      title: Data, used to login into Eversity.
+      type: object
+      properties:
+        username:
+          type: string
+          description: Schools.by username (username, used to log in into Schools.by)
+        password:
+          type: string
+          description: Schools.by password (password, used to log in into Schools.by)
+tags:
+  - name: Authentication
+    description: Everything about authentication
+paths:
+  /auth/login:
+    post:
+      summary: "Login user"
+      description: >
+        Logs user into it's Schools.by account and (if user is not registered already) downloads all of needed data.
+        Returns JWT token, that contains user ID and Eversity token (used to authenticate user).\
+
+        ***WARNING: Because of communicating with Schools.by and parsing all of it's data, response time may be very long (in testing environment: ~13 secs). Recommended timeout: 20 seconds (server may be installed on old hardware with bad internet access).***
+      tags:
+        - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginData"
+      responses:
+        '200':
+          description: Everything went good.
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: >
+                  JWT access token.\
+
+                  (note: Given JWT access token example is not valid because of invalid signature.)
+                example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJFbnJvbGxpZS9FdmVyc2l0eUpXVCIsImlzcyI6IkVucm9sbGllLUV2ZXJzaXR5SldUIiwidXNlcklEIjoiMTIzNDU2IiwidG9rZW4iOiI1OTViMzRjOC1kYWFkLTQ5YTctYjY1ZS1hMzgxNTYwNTllNzUifQ.h59A1gXGWJ471RC17nzY5heODKF-EVC89EvmBsrW-OA
+        '401':
+          description: Schools.by rejected username or password
+        '400':
+          description: JSON deserialization failed. It usually indicates that JSON is malformed.
+  /auth/invalidate/all:
+    post:
+      summary: "Invalidates  user tokens"
+      description: >
+        Invalidates *(bans)* **ALL** user Eversity access tokens based on request authentication token (does not do anything to data in Schools.by). Basically, logs user out of all clients.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All Eversity access tokens were banned and invalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed_tokens:
+                    type: integer
+                    example: 21
+        '401':
+          description: Authentication failed. JWT token was not approved by checker. Usually indicates that Authorization header is not valid.
+  /auth/invalidate/current:
+    post:
+      summary: "Invalidates used token"
+      description: >
+        Invalidates token that was supplied with request. Basically, logs user out of given session.
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: >
+            Token was successfully invalidated.\
+
+            After receiving this response, token that was supplied with request cannot be reused and **should be discarded immediately**
+        '401':
+          description: Authentication failed. JWT token was not approved by checker. Usually indicates that Authorization header is not valid.

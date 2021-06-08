@@ -8,7 +8,6 @@
 package by.enrollie.eversity.data_functions
 
 import by.enrollie.eversity.data_classes.DayOfWeek
-import io.ktor.util.*
 import java.util.*
 
 /**

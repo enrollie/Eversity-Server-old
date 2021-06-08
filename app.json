@@ -1,8 +1,0 @@
-{
-  "name": "Eversity Server",
-  "description": "Eversity Core API",
-  "image": "heroku/java",
-  "addons": [
-    "heroku-postgresql"
-  ]
-}

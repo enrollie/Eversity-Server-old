@@ -25,7 +25,7 @@ open class EversityJWT private constructor(secret: String) {
     /**
      * Generate JWT with userID and Token
      *
-     * @param userId ID of user to issue JWT
+     * @param userID ID of user to issue JWT
      * @param token User access token
      *
      * @return String, made of JWT

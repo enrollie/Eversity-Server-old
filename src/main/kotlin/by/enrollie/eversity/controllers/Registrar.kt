@@ -7,7 +7,6 @@
 
 package by.enrollie.eversity.controllers
 
-import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.database.EversityDatabase
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.util.*
@@ -35,19 +34,20 @@ class Registrar {
      *
      * @throws IllegalArgumentException Thrown, if [schoolsWebWrapper] doesn't have valid cookies.
      */
-    suspend fun registerClass(classID: Int, schoolsWebWrapper: SchoolsWebWrapper):Boolean{
-        if(!schoolsWebWrapper.validateCookies()){
-            val illegalArgumentException = IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
+    suspend fun registerClass(classID: Int, schoolsWebWrapper: SchoolsWebWrapper): Boolean {
+        if (!schoolsWebWrapper.validateCookies()) {
+            val illegalArgumentException =
+                IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
             logger.error(illegalArgumentException)
             throw illegalArgumentException
         }
-        if(!EversityDatabase.shouldUpdateClass(classID))
+        if (!EversityDatabase.shouldUpdateClass(classID))
             return false
         val classTeacherID = schoolsWebWrapper.fetchClassForTeacher(classID)
+        EversityDatabase.registerClass(classID, classTeacherID)
         val classTimetable = schoolsWebWrapper.fetchClassTimetable(classID)
         val pupilsArray = schoolsWebWrapper.fetchPupilsArray(classID)
-        EversityDatabase.registerClass(classID, classTeacherID)
-        EversityDatabase.registerClassTimetable(classID,classTimetable)
+        EversityDatabase.registerClassTimetable(classID, classTimetable)
         EversityDatabase.registerManyPupils(pupilsArray)
         return true
     }
@@ -57,9 +57,10 @@ class Registrar {
      * @param userID ID of teacher
      * @param schoolsWebWrapper Initialized [SchoolsWebWrapper] (contains valid credentials)
      */
-    suspend fun registerTeacherTimetable(userID:Int, schoolsWebWrapper: SchoolsWebWrapper):Boolean{
-        if(!schoolsWebWrapper.validateCookies()){
-            val illegalArgumentException = IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
+    suspend fun registerTeacherTimetable(userID: Int, schoolsWebWrapper: SchoolsWebWrapper): Boolean {
+        if (!schoolsWebWrapper.validateCookies()) {
+            val illegalArgumentException =
+                IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
             logger.error(illegalArgumentException)
             //TODO: Throw some kind of "not a class teacher exception"
             throw illegalArgumentException

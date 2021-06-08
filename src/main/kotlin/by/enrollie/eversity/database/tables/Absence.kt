@@ -5,6 +5,8 @@
  * All rights are reserved.
  */
 
+@file:Suppress("unused", "unused")
+
 package by.enrollie.eversity.database.tables
 
 import org.jetbrains.exposed.sql.Table

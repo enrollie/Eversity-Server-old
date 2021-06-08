@@ -14,7 +14,10 @@ import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.naming.AuthenticationException
@@ -25,6 +28,7 @@ import javax.naming.AuthenticationException
  * @author Pavel Matusevich (Neitex)
  * @constructor Constructs wrapper class without initializing token.
  */
+@Suppress("unused")
 class SchoolsAPIClient() {
     private var token: String = "null"
     private var userType: APIUserType? = null

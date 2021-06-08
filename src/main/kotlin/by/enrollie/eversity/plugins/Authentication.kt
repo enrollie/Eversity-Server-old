@@ -13,19 +13,17 @@ import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.auth.jwt.*
-import io.ktor.http.*
 
 fun Application.configureAuthentication() {
     install(Authentication) {
         jwt("jwt") {
             verifier(EversityJWT.instance.verifier)
             validate { jwtCredential ->
-                log.error(jwtCredential.payload.claims.toString())
                 val userID = jwtCredential.payload.getClaim("userID").asString().toInt()
                 val token = jwtCredential.payload.getClaim("token").asString()
-                if (EversityDatabase.checkToken(userID, token).first){
-                    User(userID, EversityDatabase.getUserType(userID))
-                }else{
+                if (EversityDatabase.checkToken(userID, token).first) {
+                    User(userID, EversityDatabase.getUserType(userID), token)
+                } else {
                     null
                 }
             }

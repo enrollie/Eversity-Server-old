@@ -20,27 +20,37 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
-import java.security.MessageDigest
-import kotlin.text.Charsets.UTF_8
-
-fun md5(str: String): ByteArray = MessageDigest.getInstance("MD5").digest(str.toByteArray(UTF_8))
-fun ByteArray.toHex() = joinToString(separator = "") { byte -> "%02x".format(byte) }
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 fun Route.authRoutes() {
     val authController = AuthController()
     route("/api/auth") {
         authenticate("jwt") {
-            post("/invalidate") {
-                val user = call.authentication.principal<User>() ?: return@post call.respond(
-                    HttpStatusCode.Forbidden,
-                    "Authentication failed. Check your token."
-                )
-                val removedTokenCount = EversityDatabase.invalidateTokens(user.id, "USER_REQUEST")
-                return@post call.respond(
-                    HttpStatusCode.OK,
-                    Json.encodeToString(mapOf("removed_tokens" to removedTokenCount))
-                )
+            route("/invalidate") {
+                post("/all") {
+                    val user = call.authentication.principal<User>() ?: return@post call.respond(
+                        HttpStatusCode.Forbidden,
+                        "Authentication failed. Check your token."
+                    )
+                    val removedTokenCount = EversityDatabase.invalidateAllTokens(user.id, "USER_REQUEST")
+                    return@post call.respond(
+                        HttpStatusCode.OK,
+                        Json.encodeToString(mapOf("removed_tokens" to removedTokenCount))
+                    )
+                }
+                post("/current") {
+                    val user = call.authentication.principal<User>() ?: return@post call.respond(
+                        HttpStatusCode.Forbidden,
+                        "Authentication failed. Check your token."
+                    )
+                   EversityDatabase.invalidateSingleToken(user.id, user.token, "USER_REQUEST")
+                    return@post call.respond(
+                        HttpStatusCode.OK
+                    )
+                }
             }
         }
         post("/login") {

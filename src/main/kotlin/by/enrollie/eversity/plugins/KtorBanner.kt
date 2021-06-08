@@ -10,9 +10,6 @@ package by.enrollie.eversity.plugins
 import by.enrollie.eversity.EVERSITY_PUBLIC_NAME
 import by.enrollie.eversity.EVERSITY_WEBSITE
 import by.enrollie.eversity.main
-import com.github.ajalt.mordant.animation.animation
-import com.github.ajalt.mordant.animation.progressAnimation
-import com.github.ajalt.mordant.animation.textAnimation
 import com.github.ajalt.mordant.rendering.TextColors
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.application.*

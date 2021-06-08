@@ -7,5 +7,4 @@
 
 package by.enrollie.eversity.exceptions
 
-class UserNotRegistered(msg: String) : Exception(msg) {
-}
+class UserNotRegistered(msg: String) : Exception(msg)
