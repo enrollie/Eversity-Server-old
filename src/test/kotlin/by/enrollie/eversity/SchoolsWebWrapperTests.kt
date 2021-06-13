@@ -19,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
@@ -90,8 +91,8 @@ class SchoolsWebWrapperTests {
             val validMap = Json.decodeFromString<Map<DayOfWeek, Array<Lesson>>>(String(validResponseFile.readBytes()))
             val responseMap = SchoolsWebWrapper(client).fetchClassTimetable(1)
             assertEquals(
-                validMap,
-                responseMap,
+                Json.encodeToJsonElement(validMap),
+                Json.encodeToJsonElement(responseMap),
                 "Response map size: ${responseMap.size}; Valid map size: ${validMap.size}"
             )
         }

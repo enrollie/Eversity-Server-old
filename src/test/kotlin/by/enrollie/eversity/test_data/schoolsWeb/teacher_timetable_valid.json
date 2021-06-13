@@ -2,7 +2,7 @@
   "MONDAY": [
     {
       "place": 2,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 10,
         "startM": 0,
@@ -13,7 +13,7 @@
     },
     {
       "place": 3,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 11,
         "startM": 0,
@@ -24,7 +24,7 @@
     },
     {
       "place": 5,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 0,
@@ -35,7 +35,7 @@
     },
     {
       "place": 6,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 55,
@@ -48,7 +48,7 @@
   "TUESDAY": [
     {
       "place": 1,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 9,
         "startM": 0,
@@ -59,7 +59,7 @@
     },
     {
       "place": 2,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 10,
         "startM": 0,
@@ -70,7 +70,7 @@
     },
     {
       "place": 3,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 11,
         "startM": 0,
@@ -81,7 +81,7 @@
     },
     {
       "place": 4,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 12,
         "startM": 0,
@@ -94,7 +94,7 @@
   "WEDNESDAY": [
     {
       "place": 1,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 9,
         "startM": 0,
@@ -105,7 +105,7 @@
     },
     {
       "place": 2,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 10,
         "startM": 0,
@@ -116,7 +116,7 @@
     },
     {
       "place": 3,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 11,
         "startM": 0,
@@ -127,7 +127,7 @@
     },
     {
       "place": 4,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 12,
         "startM": 0,
@@ -138,7 +138,7 @@
     },
     {
       "place": 6,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 55,
@@ -149,7 +149,7 @@
     },
     {
       "place": 7,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 14,
         "startM": 55,
@@ -162,7 +162,7 @@
   "THURSDAY": [
     {
       "place": 2,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 10,
         "startM": 0,
@@ -173,7 +173,7 @@
     },
     {
       "place": 3,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 11,
         "startM": 0,
@@ -184,7 +184,7 @@
     },
     {
       "place": 4,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 12,
         "startM": 0,
@@ -195,7 +195,7 @@
     },
     {
       "place": 5,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 0,
@@ -206,7 +206,7 @@
     },
     {
       "place": 6,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 55,
@@ -219,7 +219,7 @@
   "FRIDAY": [
     {
       "place": 1,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 9,
         "startM": 0,
@@ -230,7 +230,7 @@
     },
     {
       "place": 2,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 10,
         "startM": 0,
@@ -241,7 +241,7 @@
     },
     {
       "place": 3,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 11,
         "startM": 0,
@@ -252,7 +252,7 @@
     },
     {
       "place": 5,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 0,
@@ -263,7 +263,7 @@
     },
     {
       "place": 6,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 55,
@@ -276,7 +276,7 @@
   "SATURDAY": [
     {
       "place": 5,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 0,
@@ -287,7 +287,7 @@
     },
     {
       "place": 6,
-      "name": "Биология",
+      "title": "Биология",
       "schedule": {
         "startH": 13,
         "startM": 55,
