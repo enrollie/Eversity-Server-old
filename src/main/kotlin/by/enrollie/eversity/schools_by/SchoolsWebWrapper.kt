@@ -285,7 +285,7 @@ class SchoolsWebWrapper {
      * @return Map <[DayOfWeek], [TimetableDay]>, containing all work days (from Monday to Saturday)
      * @throws NotFoundException Thrown, if Schools.by returned 404 code (usually, class ID is invalid)
      */
-    suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, TimetableDay> {
+    suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
         val response = client.request<HttpResponse> {
             url.takeFrom("$subdomainURL/class/$classID/timetable")
             method = HttpMethod.Get
@@ -295,7 +295,7 @@ class SchoolsWebWrapper {
             throw NotFoundException("Timetable of class with class ID $classID not found.")
         }
         val pageString = response.receive<String>()
-        val timetableMap = mutableMapOf<DayOfWeek, TimetableDay>()
+        val timetableMap = mutableMapOf<DayOfWeek, Array<Lesson>>()
         try {
             htmlDocument(pageString) {
                 div {
@@ -356,7 +356,7 @@ class SchoolsWebWrapper {
                                         }
                                     }
                                 }
-                                timetableMap[day] = TimetableDay(day, dayTimetable)
+                                timetableMap[day] = dayTimetable
                             }
                         }
                     }
@@ -460,7 +460,7 @@ class SchoolsWebWrapper {
 
                                                             table[lessonIndex][dayIndex] = TeacherLesson(
                                                                 place = lessonIndex.toShort(),
-                                                                name = name,
+                                                                title = name,
                                                                 schedule = timeConstraints,
                                                                 classID = classID
                                                             )

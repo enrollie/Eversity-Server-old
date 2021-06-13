@@ -17,6 +17,7 @@ import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.routes.registerAuthRoute
+import by.enrollie.eversity.routes.registerUsersRoute
 import by.enrollie.eversity.security.EversityJWT
 import io.ktor.application.*
 import io.ktor.features.*
@@ -86,6 +87,8 @@ fun Application.module(testing: Boolean = false) {
     configureAuthentication()
     configureHTTP()
     registerAuthRoute()
+    registerUsersRoute()
+
     //TODO: Remove, when web client is done
     routing {
         get("/") {

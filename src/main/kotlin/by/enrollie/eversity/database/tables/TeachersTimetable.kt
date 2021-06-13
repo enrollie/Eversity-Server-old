@@ -10,7 +10,7 @@ package by.enrollie.eversity.database.tables
 import org.jetbrains.exposed.sql.Table
 
 object  TeachersTimetable: Table() {
-    val id = (integer("id") references Teachers.id)
+    val id = (integer("id") references Teachers.id).uniqueIndex()
     val monday = text("monday")
     val tuesday = text("tuesday")
     val wednesday = text("wednesday")

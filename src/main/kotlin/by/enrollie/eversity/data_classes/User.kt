@@ -7,7 +7,12 @@
 
 package by.enrollie.eversity.data_classes
 
+import by.enrollie.eversity.database.EversityDatabase
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Lesson(val place:Int, val title:String, val schedule: TimeConstraints)
+data class User(val id: Int, val type: APIUserType) {
+    fun isValid(): Boolean =
+        EversityDatabase.doesUserExist(id)
+
+}

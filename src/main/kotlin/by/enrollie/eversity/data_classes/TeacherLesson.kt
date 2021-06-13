@@ -10,4 +10,4 @@ package by.enrollie.eversity.data_classes
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class TeacherLesson(val place:Short, val name:String,val schedule:TimeConstraints, val classID:Int)
+data class TeacherLesson(val place: Short, val title: String, val schedule: TimeConstraints, val classID: Int)

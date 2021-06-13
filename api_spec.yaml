@@ -9,6 +9,8 @@ servers:
     variables:
       server:
         default: http://127.0.0.1:8080
+  - url: 'http://eversity-public.neitex.me/api'
+    description: Public Eversity test server. Subdomain URL variable is set to "https://191minsk.schools.by/"
 components:
   securitySchemes:
     BearerAuth:
@@ -16,6 +18,20 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ErrorData:
+      title: Additional information of error
+      description: >
+        Additional information of error, made to make better understanding of what happened and actions, that server did.
+      type: object
+      properties:
+        errorCode:
+          type: string
+          description: Name of error
+          example: INVALID_COOKIES
+        action:
+          type: string
+          description: Actions that server done. Usually client should to the same.
+          example: INVALIDATE_ALL_TOKENS
     LoginData:
       title: Data, used to login into Eversity.
       type: object
@@ -26,9 +42,135 @@ components:
         password:
           type: string
           description: Schools.by password (password, used to log in into Schools.by)
+          format: password
+    LessonTimeConstraints:
+      title: Times of start and end of lesson
+      type: object
+      properties:
+        startH:
+          type: integer
+          description: Start hour of lesson
+          example: 9
+        startM:
+          type: integer
+          description: Start minute of lesson
+          example: 0
+        endH:
+          type: integer
+          description: End hour of lesson
+          example: 9
+        endM:
+          type: integer
+          description: End minute of lesson
+          example: 45
+    PupilLesson:
+      title: Lesson of pupil
+      type: object
+      properties:
+        place:
+          type: integer
+          description: Place of lesson in timetable
+          example: 2
+        title:
+          type: string
+          description: Full title of lesson
+          example: Физическая культура и здоровье
+        schedule:
+          $ref: '#/components/schemas/LessonTimeConstraints'
+    TeacherLesson:
+      title: Lesson of teacher
+      type: object
+      description: PupilLesson schema extended with 'classID' property, which contains class ID, who teacher is teaching lesson to
+      properties:
+        place:
+          type: integer
+          description: Place of lesson in timetable
+          example: 2
+        title:
+          type: string
+          description: Full title of lesson
+          example: Физическая культура и здоровье
+        schedule:
+          $ref: '#/components/schemas/LessonTimeConstraints'
+        classID:
+          type: integer
+          description: Class ID, who teacher is teaching lesson to.
+          example: 12345
+    Timetable:
+      title: Timetable
+      description: Timetable contains days in form of map. All of elements are either PupilLesson, either TeacherLesson (all of elements are of the same type).
+      type: object
+      properties:
+        MONDAY:
+          description: Timetable of monday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+        TUESDAY:
+          description: Timetable of tuesday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+        WEDNESDAY:
+          description: Timetable of wednesday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+        THURSDAY:
+          description: Timetable of thursday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+        FRIDAY:
+          description: Timetable of friday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+        SATURDAY:
+          description: Timetable of saturday
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/PupilLesson'
+              - $ref: '#/components/schemas/TeacherLesson'
+
+    BasicUserData:
+      title: User data retrieved from /user/{id}
+      type: object
+      properties:
+        id:
+          type: integer
+          description: User's Schools.by ID (same as Eversity ID)
+        type:
+          type: string
+          description: Type of user (corelates with Schools.by user type, but some of types are not present in Schools.by)
+        firstName:
+          type: string
+          description: User's first name
+        middleName:
+          type: string
+          nullable: true
+          description: User's middle name (father's name) if present
+        lastName:
+          type: string
+          description: User's last name
+        timetable:
+          $ref: '#/components/schemas/Timetable'
 tags:
   - name: Authentication
     description: Everything about authentication
+  - name: User data
+    description: Everything about getting and updating user data
 paths:
   /auth/login:
     post:
@@ -69,7 +211,7 @@ paths:
       tags:
         - Authentication
       security:
-        - BearerAuth: []
+        - BearerAuth: [ ]
       responses:
         '200':
           description: All Eversity access tokens were banned and invalidated.
@@ -100,3 +242,54 @@ paths:
             After receiving this response, token that was supplied with request cannot be reused and **should be discarded immediately**
         '401':
           description: Authentication failed. JWT token was not approved by checker. Usually indicates that Authorization header is not valid.
+  /user/{id}:
+    get:
+      summary: Fetches user data (name, type and timetable)
+      description: >
+        Fetches user data and returns it in JSON format
+      tags:
+        - User data
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: integer
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicUserData'
+        '404':
+          description: User with given ID was not found
+    post:
+      summary: Updates user data
+      tags:
+        - User data
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: integer
+      security:
+          - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Everything went good
+        '404':
+          description: User with given ID was not found
+        '412':
+          description: >
+            Cookies of requested user were invalid, thus action failed. If requested user is the same user, who authenticated,
+            **all** of Eversity access tokens are invalidated and client should log user out with message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'

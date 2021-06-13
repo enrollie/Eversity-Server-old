@@ -10,7 +10,7 @@ package by.enrollie.eversity.database.tables
 import org.jetbrains.exposed.sql.Table
 
 object Credentials: Table() {
-    val id = (integer("id") references Users.id)
+    val id = (integer("id") references Users.id).uniqueIndex()
     val csrfToken = varchar("csrftoken", 50).nullable()
     val sessionID = varchar("sessionID", 50).nullable()
     val token = varchar("token", 50)

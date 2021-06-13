@@ -11,11 +11,15 @@ package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.tables.*
+import by.enrollie.eversity.exceptions.ClassNotRegistered
 import by.enrollie.eversity.exceptions.UserNotRegistered
-import by.enrollie.eversity.security.User
 import by.enrollie.eversity.tokenCacheValidityMinutes
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.batchInsert
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
@@ -56,9 +60,16 @@ object EversityDatabase {
      * @return true, if user exists. false otherwise
      */
     fun doesUserExist(userID: Int): Boolean {
+        if (usersCacheList.find {
+                it.first.id == userID
+            } != null) {
+            return true
+        }
         val tos = transaction {
             Users.select { Users.id eq userID }.toList()
         }
+        if (tos.isNotEmpty())
+            GlobalScope.launch { usersCacheList.add(Pair(User(userID, getUserType(userID)), DateTime.now())) }
         return tos.isNotEmpty()
     }
 
@@ -140,14 +151,26 @@ object EversityDatabase {
         return true
     }
 
+    fun registerPupil(pupil: Pupil) = registerPupil(pupil.id, Pair(pupil.firstName, pupil.lastName), pupil.classID)
+
     /**
      * Registers many pupils at once. (does not register their timetables).
      * Ignores pupil if it already exists.
      * @param array Array, containing [Pupil]s to register
      */
     fun registerManyPupils(array: Array<Pupil>) {
-        array.forEach { pupil ->
-            registerPupil(pupil.id, Pair(pupil.firstName, pupil.lastName), pupil.classID)
+        val list = array.toList()
+        transaction {
+            Users.batchInsert(list, shouldReturnGeneratedValues = false,ignore = true) { pupil ->
+                this[Users.id] = pupil.id
+                this[Users.type] = APIUserType.Pupil.name
+            }
+            Pupils.batchInsert(list, shouldReturnGeneratedValues = false, ignore = true) { pupil ->
+                this[Pupils.id] = pupil.id
+                this[Pupils.firstName] = pupil.firstName
+                this[Pupils.lastName] = pupil.lastName
+                this[Pupils.classID] = pupil.classID
+            }
         }
     }
 
@@ -159,11 +182,15 @@ object EversityDatabase {
      *
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
-    fun registerClassTimetable(classID: Int, daysMap: Map<DayOfWeek, TimetableDay>) {
-        if (!validateDaysMap(daysMap)) {
-            throw IllegalArgumentException("daysMap is not valid.")
+    fun registerClassTimetable(classID: Int, daysMap: Map<DayOfWeek, Array<Lesson>>) {
+        require(validateDaysMap(daysMap)) { "Day map should be valid" }
+        if (!doesClassExist(classID)) {
+            throw IllegalArgumentException("Class with ID $classID does not exist")
         }
         transaction {
+            ClassTimetables.deleteWhere {
+                ClassTimetables.id eq classID
+            }
             ClassTimetables.insert {
                 it[id] = classID
                 it[monday] = Json.encodeToString(daysMap[DayOfWeek.MONDAY])
@@ -223,8 +250,9 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if no user with such ID is registered
      */
     fun invalidateAllTokens(userID: Int, reason: String?): Int {
-        if (!doesUserExist(userID))
-            throw IllegalArgumentException("Database does not contain user with such user ID ($userID)")
+        if (!doesUserExist(userID)) {
+            throw UserNotRegistered("User with ID $userID does not exist")
+        }
         val tokensToInvalidate = transaction {
             Tokens.select {
                 Tokens.userID eq userID
@@ -300,7 +328,7 @@ object EversityDatabase {
      */
     fun obtainCredentials(userID: Int): Triple<String?, String?, String> {
         if (!doesUserExist(userID)) {
-            throw IllegalArgumentException("Credentials not found for user ID $userID")
+            throw UserNotRegistered("User with ID $userID does not exist")
         }
         val cachedCredentials = credentialsCacheList.find {
             it.first == userID
@@ -342,7 +370,7 @@ object EversityDatabase {
      */
     fun insertOrUpdateCredentials(userID: Int, credentials: Triple<String?, String?, String>) {
         if (!doesUserExist(userID)) {
-            throw IllegalArgumentException("User does not exist!")
+            throw UserNotRegistered("User with ID $userID does not exist")
         }
         credentialsCacheList.removeIf {
             it.first == userID
@@ -395,6 +423,9 @@ object EversityDatabase {
             throw IllegalArgumentException("daysMap is not valid.")
         }
         transaction {
+            TeachersTimetable.deleteWhere {
+                TeachersTimetable.id eq teacherID
+            }
             TeachersTimetable.insert {
                 it[id] = teacherID
                 it[monday] = Json.encodeToString(daysMap[DayOfWeek.MONDAY])
@@ -408,7 +439,7 @@ object EversityDatabase {
     }
 
     /**
-     * Determines, whether you should update class data
+     * Determines, whether class should be updated or not
      * @param classID ID of class
      * @return True, if you SHOULD (!) update class data. False otherwise
      */
@@ -463,13 +494,21 @@ object EversityDatabase {
      */
     fun getPupilClass(userID: Int): Int {
         if (!doesUserExist(userID)) {
-            throw IllegalArgumentException("User with ID $userID not found in database.")
+            throw UserNotRegistered("User with ID $userID does not exist")
         }
+        if (getUserType(userID) != APIUserType.Pupil)
+            throw IllegalArgumentException("User with ID $userID is not a pupil (they are ${getUserType(userID)}, in fact)")
+        val cachedPupil = pupilsCacheList.find {
+            it.first.id == userID
+        }?.first
+        if (cachedPupil != null)
+            return cachedPupil.classID
         val classIDElement = transaction {
             Pupils.select {
                 Pupils.id eq userID
             }.toList().firstOrNull()
         } ?: throw IllegalArgumentException("Pupil with ID $userID not found in Pupils table.")
+        GlobalScope.launch { getUserName(userID, APIUserType.Pupil) } //This call will asynchronously cache pupil
         return classIDElement[Pupils.classID]
     }
 
@@ -495,7 +534,7 @@ object EversityDatabase {
      * @param reason Reason of invalidation (if null, defaults to "Unknown")
      * @return True, if token was banned. False, if user is not found.
      */
-    fun invalidateSingleToken(userID: Int, token: String, reason: String?):Boolean {
+    fun invalidateSingleToken(userID: Int, token: String, reason: String?): Boolean {
         if (!doesUserExist(userID)) {
             return false
         }
@@ -516,4 +555,131 @@ object EversityDatabase {
         }
         return true
     }
+
+    /**
+     * Returns user's full name
+     * @param userID User ID
+     * @param type User type (if you don't have one, see [getUserType]
+     * @return Triple, made of First name, Middle name and Last name correspondingly
+     */
+    fun getUserName(userID: Int, type: APIUserType): Triple<String, String?, String> {
+        if (!doesUserExist(userID)) {
+            throw UserNotRegistered("User with ID $userID does not exist")
+        }
+        return when (type) {
+            APIUserType.Pupil -> {
+                val cachedPupil = pupilsCacheList.find {
+                    it.first.id == userID
+                }
+                if (cachedPupil != null)
+                    return Triple(cachedPupil.first.firstName, null, cachedPupil.first.lastName)
+                val pupil = transaction {
+                    Pupils.select {
+                        Pupils.id eq userID
+                    }.toList().firstOrNull()
+                }
+                    ?: throw NoSuchElementException("Pupil with ID $userID was not found in Pupils database. Are you sure that user with ID $userID is a pupil?")
+                pupilsCacheList.add(
+                    Pair(
+                        Pupil(
+                            userID,
+                            pupil[Pupils.firstName],
+                            pupil[Pupils.lastName],
+                            pupil[Pupils.classID]
+                        ), DateTime.now()
+                    )
+                )
+                Triple(pupil[Pupils.firstName], null, pupil[Pupils.lastName])
+            }
+            APIUserType.Parent -> {
+                Triple("WE DON\'T STORE PARENTS DATA YET", null, "why did you even ask lol")
+            }
+            APIUserType.Teacher -> {
+                //TODO: Add caching
+                val teacher = transaction {
+                    Teachers.select {
+                        Teachers.id eq userID
+                    }.toList().firstOrNull()
+                }
+                    ?: throw NoSuchElementException("Teacher with ID $userID was not found in database. Are you sure that user $userID is a teacher?")
+                Triple(teacher[Teachers.firstName], teacher[Teachers.middleName], teacher[Teachers.lastName])
+            }
+            APIUserType.SYSTEM -> {
+                //TODO: Record tech guys info somewhere
+                Triple("Eversity", "System", "Administrator")
+            }
+        }
+    }
+
+    /**
+     * Returns teacher's timetable
+     * @param userID Teacher's ID
+     * @return Map, containing six arrays of lessons (may be unsorted), mapped to six [DayOfWeek]'s (from Monday to Saturday)
+     */
+    fun getTeacherTimetable(userID: Int): Map<DayOfWeek, Array<TeacherLesson>> {
+        if (!doesUserExist(userID)) {
+            throw UserNotRegistered("User with ID $userID does not exist")
+        }
+        if (getUserType(userID) != APIUserType.Teacher)
+            throw IllegalArgumentException("User with ID $userID is not a Teacher (they are ${getUserType(userID).name}, in fact)")
+        //TODO: Add caching
+        val timetable = transaction {
+            TeachersTimetable.select {
+                TeachersTimetable.id eq userID
+            }.toList().firstOrNull()
+        }
+            ?: throw NoSuchElementException("Timetable of teacher with ID $userID was not found. Most likely, database bad times are coming")
+        val timetableMap = mutableMapOf<DayOfWeek, Array<TeacherLesson>>()
+        //Danger: big chunk of code incoming
+        timetableMap[DayOfWeek.MONDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.monday])
+        timetableMap[DayOfWeek.TUESDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.tuesday])
+        timetableMap[DayOfWeek.WEDNESDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.wednesday])
+        timetableMap[DayOfWeek.THURSDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.thursday])
+        timetableMap[DayOfWeek.FRIDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.friday])
+        timetableMap[DayOfWeek.SATURDAY] =
+            Json.decodeFromString(timetable[TeachersTimetable.saturday])
+        return timetableMap
+    }
+
+    /**
+     * Returns class timetable
+     * @param classID ID of class
+     * @return Map, containing six arrays of lessons (may be unsorted), mapped to six [DayOfWeek]'s (from Monday to Saturday)
+     */
+    fun getClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
+        if (!doesClassExist(classID)) { throw ClassNotRegistered("Class with ID $classID does not exist") }
+        val timetableQuery = transaction {
+            ClassTimetables.select {
+                ClassTimetables.id eq classID
+            }.toList().firstOrNull()
+        }
+            ?: throw NoSuchElementException("Class timetable of class with id $classID was not found. Database is waiting for bad times")
+        val timetableMap = mutableMapOf<DayOfWeek, Array<Lesson>>()
+        //Danger: big chunk of code incoming
+        timetableMap[DayOfWeek.MONDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.monday])
+        timetableMap[DayOfWeek.TUESDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.tuesday])
+        timetableMap[DayOfWeek.WEDNESDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.wednesday])
+        timetableMap[DayOfWeek.THURSDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.thursday])
+        timetableMap[DayOfWeek.FRIDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.friday])
+        timetableMap[DayOfWeek.SATURDAY] =
+            Json.decodeFromString(timetableQuery[ClassTimetables.saturday])
+        return timetableMap
+    }
+
+    /**
+     * Retrieves pupil's timetable
+     * @param userID ID of pupil
+     * @throws IllegalArgumentException Thrown, if pupil is not found in database
+     */
+    fun getPupilTimetable(userID: Int) = getClassTimetable(getPupilClass(userID))
 }

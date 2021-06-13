@@ -18,6 +18,7 @@ fun Application.configureAuthentication() {
     install(Authentication) {
         jwt("jwt") {
             verifier(EversityJWT.instance.verifier)
+            realm = "Eversity-Core/JWT"
             validate { jwtCredential ->
                 val userID = jwtCredential.payload.getClaim("userID").asString().toInt()
                 val token = jwtCredential.payload.getClaim("token").asString()
