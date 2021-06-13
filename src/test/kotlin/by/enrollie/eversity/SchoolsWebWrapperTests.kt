@@ -8,9 +8,9 @@
 package by.enrollie.eversity
 
 import by.enrollie.eversity.data_classes.DayOfWeek
+import by.enrollie.eversity.data_classes.Lesson
 import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.data_classes.TeacherLesson
-import by.enrollie.eversity.data_classes.TimetableDay
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -87,7 +87,7 @@ class SchoolsWebWrapperTests {
             if (!validResponseFile.exists()) {
                 throw IllegalArgumentException("Valid result for class timetable is not found (path: \"${validResponseFile.absolutePath}\")")
             }
-            val validMap = Json.decodeFromString<Map<DayOfWeek, TimetableDay>>(String(validResponseFile.readBytes()))
+            val validMap = Json.decodeFromString<Map<DayOfWeek, Array<Lesson>>>(String(validResponseFile.readBytes()))
             val responseMap = SchoolsWebWrapper(client).fetchClassTimetable(1)
             assertEquals(
                 validMap,

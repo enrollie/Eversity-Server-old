@@ -178,7 +178,7 @@ object EversityDatabase {
      * Registers (or, overwrites, if exists) timetable for class
      *
      * @param classID ID of pupil
-     * @param daysMap Map of <[DayOfWeek], [TimetableDay]>. MUST contain at least six elements (days) AND less than 8 elements
+     * @param daysMap Map of <[DayOfWeek], Array of [Lesson]>. MUST contain at least six elements (days) AND less than 8 elements
      *
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */
@@ -414,7 +414,7 @@ object EversityDatabase {
      * Registers (or, overwrites, if exists) timetable for teacher
      *
      * @param teacherID ID of pupil
-     * @param daysMap Map of <[DayOfWeek], [TimetableDay]>. MUST contain at least six elements (days) AND less than 8 elements
+     * @param daysMap Map of <[DayOfWeek], Array of [TeacherLesson]]]>. MUST contain at least six elements (days) AND less than 8 elements
      *
      * @throws IllegalArgumentException Thrown, if [daysMap] does not contain some day of week (except SUNDAY) OR it has less than six elements
      */

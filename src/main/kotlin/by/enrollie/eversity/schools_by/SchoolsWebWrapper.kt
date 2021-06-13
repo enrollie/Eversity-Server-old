@@ -282,7 +282,7 @@ class SchoolsWebWrapper {
      * Fetches class timetable
      *
      * @param classID ID of class
-     * @return Map <[DayOfWeek], [TimetableDay]>, containing all work days (from Monday to Saturday)
+     * @return Map <[DayOfWeek], Array of [Lesson]>, containing all work days (from Monday to Saturday)
      * @throws NotFoundException Thrown, if Schools.by returned 404 code (usually, class ID is invalid)
      */
     suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
