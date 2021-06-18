@@ -23,11 +23,15 @@ application {
 
 fun getGitVersion(): String {
     val os = org.apache.commons.io.output.ByteArrayOutputStream()
-    project.exec {
-        commandLine = "git describe --tags --long".split(" ")
-        standardOutput = os
+    return try {
+        project.exec {
+            commandLine = "git describe --tags --long".split(" ")
+            standardOutput = os
+        }.rethrowFailure()
+        String(os.toByteArray()).trim()
+    }catch (e: org.gradle.process.internal.ExecException){
+        "NON-GIT BUILD"
     }
-    return String(os.toByteArray()).trim()
 }
 
 repositories {
