@@ -72,7 +72,7 @@ fun Application.module(testing: Boolean = false) {
     }
     kotlin.run {
         val props = Properties()
-        props.load(this.javaClass.getResourceAsStream("/application.properties"))
+        props.load(this.javaClass.getResourceAsStream("/appInfo.properties"))
         EVERSITY_VERSION = props.getProperty("appVersion")
         EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
         EVERSITY_BUILD_DATE = props.getProperty("buildDate")
