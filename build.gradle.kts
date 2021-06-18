@@ -17,8 +17,7 @@ plugins {
 group = "by.enrollie.eversity"
 version = getGitVersion()
 application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
-    mainClassName = "io.ktor.server.netty.EngineMain"
+    mainClass.set("by.enrollie.eversity.ApplicationKt")
 }
 
 fun getGitVersion(): String {
@@ -29,7 +28,7 @@ fun getGitVersion(): String {
             standardOutput = os
         }.rethrowFailure()
         String(os.toByteArray()).trim()
-    }catch (e: org.gradle.process.internal.ExecException){
+    } catch (e: org.gradle.process.internal.ExecException) {
         "NON-GIT BUILD"
     }
 }
@@ -85,7 +84,7 @@ compileKotlin.kotlinOptions {
     jvmTarget = "1.8"
 }
 compileKotlin.dependsOn.add((tasks.getByName("processResources") as ProcessResources).apply {
-    filesMatching("application.properties") {
+    filesMatching("appInfo.properties") {
         val props = mutableMapOf<String, String>()
         props["appVersion"] = getGitVersion()
         val formatter = SimpleDateFormat("YYYY-MM-dd E, HH:mm:ss-SS")
@@ -108,7 +107,7 @@ tasks.register<Jar>("uberJar") {
 
     manifest {
         attributes(
-            "Main-Class" to "io.ktor.server.netty.EngineMain",
+            "Main-Class" to "by.enrollie.eversity.ApplicationKt",
             "Implementation-Title" to "Gradle",
             "Implementation-Version" to archiveVersion
         )
