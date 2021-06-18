@@ -17,10 +17,7 @@ plugins {
 group = "by.enrollie.eversity"
 version = getGitVersion()
 application {
-<<<<<<< HEAD
     mainClassName = "by.enrollie.eversity.ApplicationKt"
-=======
->>>>>>> main
     mainClass.set("by.enrollie.eversity.ApplicationKt")
 }
 
