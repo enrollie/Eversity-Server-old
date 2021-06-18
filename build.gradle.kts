@@ -100,7 +100,7 @@ compileTestKotlin.kotlinOptions {
 }
 
 tasks.create("stage") {
-    dependsOn("installDist")
+    dependsOn("uberJar")
 }
 
 tasks.register<Jar>("uberJar") {

@@ -1,1 +1,1 @@
-web: ./build/install/eversity-server/bin/eversity-server
+web: java -jar ./build/libs/eversity-server-NON-GIT BUILD.jar
