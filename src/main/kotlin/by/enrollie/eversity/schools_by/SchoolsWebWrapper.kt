@@ -31,13 +31,13 @@ import org.jetbrains.exposed.sql.exposedLogger
  * A wrapper for parsing and making data out of Schools.by HTML pages
  * @author Pavel Matusevich
  */
-class SchoolsWebWrapper {
+open class SchoolsWebWrapper {
     private val userAgent = "Eversity/1.0 (Windows NT 10.0; Win32; x86; rv:1.0) KTor/1.5.4 Eversity/1.0"
 
-    private var subdomainURL: String = "https://demo.schools.by/"
+    protected var subdomainURL: String = "https://demo.schools.by/"
     private var schoolsBYCookies: Pair<String, String> = Pair("", "")
 
-    private var client = HttpClient {
+    protected var client = HttpClient {
         followRedirects = true
         expectSuccess = false
         defaultRequest {
@@ -80,6 +80,16 @@ class SchoolsWebWrapper {
     constructor(SubdomainURL: String, Cookies: Pair<String, String>) {
         schoolsBYCookies = Cookies
         subdomainURL = SubdomainURL
+    }
+
+    /**
+     * Constructs wrapper with given cookies and standard subdomain
+     * @param Cookies Cookies
+     * @constructor Constructs wrapper with given cookies
+     */
+    constructor(Cookies: Pair<String, String>){
+        subdomainURL = configSubdomainURL ?: "https://demo.schools.by/"
+        schoolsBYCookies = Cookies
     }
 
     /**
@@ -328,7 +338,8 @@ class SchoolsWebWrapper {
                                                         a {
                                                             findAll {
                                                                 forEach { doc ->
-                                                                    if (!titles.contains(doc.attribute("title")))
+                                                                    if (!titles.contains(doc.attribute("title"))
+                                                                        && doc.attribute("title").isNotEmpty())
                                                                         titles.add(doc.attribute("title"))
                                                                 }
                                                             }
@@ -338,7 +349,8 @@ class SchoolsWebWrapper {
                                                             span {
                                                                 findAll {
                                                                     forEach { doc ->
-                                                                        if (!titles.contains(doc.attribute("title")))
+                                                                        if (!titles.contains(doc.attribute("title"))
+                                                                            && doc.attribute("title").isNotEmpty())
                                                                             titles.add(doc.attribute("title"))
                                                                     }
                                                                 }
@@ -348,7 +360,8 @@ class SchoolsWebWrapper {
                                                         }
                                                     }
                                                 }
-                                                    return@td titles.joinToString(" / ")
+
+                                                    return@td titles.toSet().joinToString(" / ")
                                                 }
                                                 if (add)
                                                     dayTimetable += Lesson(num, name, time)

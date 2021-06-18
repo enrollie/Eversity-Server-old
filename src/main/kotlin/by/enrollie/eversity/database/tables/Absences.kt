@@ -5,17 +5,14 @@
  * All rights are reserved.
  */
 
-@file:Suppress("unused", "unused")
-
 package by.enrollie.eversity.database.tables
 
 import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.jodatime.datetime
+import org.jetbrains.exposed.sql.jodatime.date
 
-object Absence:Table() {
+object Absences:Table() {
     val pupilID = (integer("pupilid") references Pupils.id)
     val classID = (integer("classid") references Classes.classID)
-    val date = datetime("date")
-    val insertedDate = datetime("insertdate")
-    val teacherID = (integer("teacherid") references Teachers.id)
+    val date = date("date")
+    val reason = varchar("reason", 12)
 }

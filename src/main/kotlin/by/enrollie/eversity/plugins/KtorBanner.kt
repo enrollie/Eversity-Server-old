@@ -35,7 +35,7 @@ fun Application.configureBanner() {
             val homepage = " $EVERSITY_WEBSITE "
             val filling = "".padEnd(banner.width - title.length - homepage.length, ' ')
             Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
-            Terminal().println(TextColors.brightBlue("$title$filling$homepage"))
+            Terminal().println(TextColors.brightBlue("$title$filling$homepage\n\n"))
         }
     }
 }

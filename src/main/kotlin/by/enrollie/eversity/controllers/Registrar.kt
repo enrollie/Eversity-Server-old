@@ -34,7 +34,7 @@ class Registrar {
      *
      * @throws IllegalArgumentException Thrown, if [schoolsWebWrapper] doesn't have valid cookies.
      */
-    suspend fun registerClass(classID: Int, schoolsWebWrapper: SchoolsWebWrapper): Boolean {
+    suspend fun registerClass(classID: Int, className: String, schoolsWebWrapper: SchoolsWebWrapper): Boolean {
         if (!schoolsWebWrapper.validateCookies()) {
             val illegalArgumentException =
                 IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
@@ -44,9 +44,17 @@ class Registrar {
         if (!EversityDatabase.shouldUpdateClass(classID))
             return false
         val classTeacherID = schoolsWebWrapper.fetchClassForTeacher(classID)
-        EversityDatabase.registerClass(classID, classTeacherID)
         val classTimetable = schoolsWebWrapper.fetchClassTimetable(classID)
         val pupilsArray = schoolsWebWrapper.fetchPupilsArray(classID)
+        var isSecondShift = false
+        for (timetable in classTimetable) {
+            if (timetable.value.isNotEmpty()) {
+                val firstLesson = timetable.value.firstOrNull() ?: continue
+                isSecondShift = firstLesson.schedule.startHour >= 13
+                break
+            }
+        }
+        EversityDatabase.registerClass(classID, classTeacherID, className, isSecondShift)
         EversityDatabase.registerClassTimetable(classID, classTimetable)
         EversityDatabase.registerManyPupils(pupilsArray)
         return true

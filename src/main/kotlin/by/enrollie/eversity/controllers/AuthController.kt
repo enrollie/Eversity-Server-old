@@ -14,6 +14,7 @@ import by.enrollie.eversity.schools_by.SchoolsAPIClient
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import by.enrollie.eversity.security.EversityJWT
 import io.ktor.util.*
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.Logger
 
@@ -56,9 +57,10 @@ class AuthController {
                     logger.error(unknownError)
                     throw unknownError
                 }.toString().toInt()
+                val className = pupilData["class_name"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
                 if (!EversityDatabase.doesClassExist(classID)) {
                     try {
-                        registrar.registerClass(classID, schoolsWeb)
+                        registrar.registerClass(classID, className, schoolsWeb)
                     } catch (e: IllegalArgumentException) {
                         logger.error(e)
                         throw UnknownError("Schools web wrapper has invalid cookies")
@@ -82,7 +84,21 @@ class AuthController {
             "Teacher" -> {
                 val classStr = schoolsWeb.fetchClassForCurrentUser()
                 if (classStr != null) {
-                    registrar.registerClass(classStr, schoolsWeb)
+                    var className = userData["short_info"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
+                    kotlin.run {
+                        var numPosition: Int = -1
+                        className = className.filterIndexed { index, c ->
+                            if (c.digitToIntOrNull() != null) {
+                                numPosition = index
+                                return@filterIndexed true
+                            }
+                            if (numPosition != -1)
+                                return@filterIndexed true
+                            false
+                        }
+                        className = className.replace("-го", "")
+                    }
+                    registrar.registerClass(classStr, className, schoolsWeb)
                     EversityDatabase.registerTeacher(
                         userID,
                         Triple(
@@ -94,15 +110,17 @@ class AuthController {
                         schoolsToken,
                         classStr
                     )
-                } else{
-                    EversityDatabase.registerTeacher(userID,
+                } else {
+                    EversityDatabase.registerTeacher(
+                        userID,
                         Triple(
                             userData["first_name"]?.jsonPrimitive?.content.toString(),
                             userData["father_name"]?.jsonPrimitive?.content.toString(),
                             userData["last_name"]?.jsonPrimitive?.content.toString()
                         ),
                         credentials,
-                        schoolsToken)
+                        schoolsToken
+                    )
                 }
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
                 val eversityToken = EversityDatabase.issueToken(userID)
@@ -137,11 +155,27 @@ class AuthController {
                 }
                 if (userData["type"]?.jsonPrimitive?.content.toString() == "Teacher") {
                     val classStr = schoolsWeb.fetchClassForCurrentUser()
+                    var className = userData["short_info"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
+                    kotlin.run {
+                        if (className == "UNKNOWN")
+                            return@run
+                        var numPosition: Int = -1
+                        className = className.filterIndexed { index, c ->
+                            if (c.digitToIntOrNull() != null) {
+                                numPosition = index
+                                return@filterIndexed true
+                            }
+                            if (numPosition != -1)
+                                return@filterIndexed true
+                            false
+                        }
+                        className = className.replace("-го", "")
+                    }
                     if (classStr != null)
-                        registrar.registerClass(classStr, schoolsWeb)
+                        registrar.registerClass(classStr, className, schoolsWeb)
                 }
             }
-            if (userData["type"]?.jsonPrimitive?.content.toString() == "Teacher"){
+            if (userData["type"]?.jsonPrimitive?.content.toString() == "Teacher") {
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
             }
         } catch (e: IllegalArgumentException) {

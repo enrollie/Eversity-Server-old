@@ -32,6 +32,40 @@ components:
           type: string
           description: Actions that server done. Usually client should to the same.
           example: INVALIDATE_ALL_TOKENS
+    ClassData:
+      title: Data of school class
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID of class
+        title:
+          type: string
+          description: Title of class
+          example: "9 \"В\""
+        classTeacherID:
+          type: integer
+          description: ID of class teacher
+        pupils:
+          type: array
+          items:
+            $ref: '#/components/schemas/PupilData'
+    PupilData:
+      description: Data of pupil
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID of pupil
+        firstName:
+          type: string
+          description: Pupil's first name
+        lastName:
+          type: string
+          description: Pupil's last name
+        classID:
+          type: integer
+          description: ID of class, that pupil relates to
     LoginData:
       title: Data, used to login into Eversity.
       type: object
@@ -143,7 +177,6 @@ components:
             oneOf:
               - $ref: '#/components/schemas/PupilLesson'
               - $ref: '#/components/schemas/TeacherLesson'
-
     BasicUserData:
       title: User data retrieved from /user/{id}
       type: object
@@ -166,11 +199,49 @@ components:
           description: User's last name
         timetable:
           $ref: '#/components/schemas/Timetable'
+    AbsenceReason:
+      title: Reason of absence
+      description: >
+        ILLNESS is used when pupil is ill;
+        HEALING is used when pupil is in sanatorium;
+        REQUEST is used when pupil is absent on request of parents;
+        COMPETITON is used when pupil is on any kind of competition (i.e. volleyball tournament);
+        UNKNOWN is used when pupil is absent for unknown reason (or pupil has bad excuse for absence)
+      type: string
+      enum:
+        - ILLNESS
+        - HEALING
+        - REQUEST
+        - COMPETITION
+        - UNKNOWN
+    AbsenceData:
+      title: Data for absence of one pupil
+      type: object
+      properties:
+        pupilID:
+          type: integer
+          description: ID of absent pupil
+        classID:
+          type: integer
+          description: Absent pupil class ID
+        date:
+          type: string
+          description: Date of absence (in YYYY-MM-dd format)
+        reason:
+          $ref: '#/components/schemas/AbsenceReason'
+
+
 tags:
   - name: Authentication
     description: Everything about authentication
   - name: User data
     description: Everything about getting and updating user data
+  - name: Class data
+    description: Everything about classes and data about them
+  - name: Absence
+    description: Everuthing about absences
+  - name: Technical
+    description: Everything about server status, system data, etc.
 paths:
   /auth/login:
     post:
@@ -279,7 +350,7 @@ paths:
           schema:
             type: integer
       security:
-          - BearerAuth: [ ]
+        - BearerAuth: [ ]
       responses:
         '200':
           description: Everything went good
@@ -293,3 +364,166 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorData'
+  /class/{id}:
+    get:
+      summary: Fetches class data
+      tags:
+        - Class data
+      parameters:
+        - name: id
+          in: path
+          description: Class ID
+          required: true
+          schema:
+            type: integer
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassData'
+        '404':
+          description: Class with given ID was not found
+        '400':
+          description: Class ID is missing or malformed
+  /class/{id}/pupils:
+    get:
+      summary: Fetches pupils list
+      tags:
+        - Class data
+      parameters:
+        - name: id
+          in: path
+          description: Class ID
+          required: true
+          schema:
+            type: integer
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PupilData'
+        '404':
+          description: Class with given ID was not found
+        '400':
+          description: Class ID is missing or malformed
+  /class/{id}/absence:
+    get:
+      summary: Fetches class absence for current day
+      tags:
+        - Class data
+        - Absence
+      parameters:
+        - name: id
+          in: path
+          description: Class ID
+          required: true
+          schema:
+            type: integer
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AbsenceData'
+        '404':
+          description: Class with given ID was not found
+        '400':
+          description: Class ID is missing or malformed
+  /class/{id}/absence/day/{date}:
+    get:
+      summary: Fetches class absence for given date
+      tags:
+        - Class data
+        - Absence
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: id
+          in: path
+          description: Class ID
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: path
+          description: Date of day in YYYY-MM-dd format
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AbsenceData'
+        '404':
+          description: Class with given ID was not found
+        '400':
+          description: Class ID or date is missing or malformed
+  /class/{id}/absence/week/{date}:
+    get:
+      summary: Fetches class absence for given week
+      description: Fetches all absences in the week in which the given date is located
+      tags:
+        - Class data
+        - Absence
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: id
+          in: path
+          description: Class ID
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: path
+          description: Date of day in YYYY-MM-dd format
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Everything went good
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AbsenceData'
+        '404':
+          description: Class with given ID was not found
+        '400':
+          description: Class ID or date is missing or malformed
+  /ping:
+    get:
+      summary: Used to check if server is online
+      description: "Does not require authentication. Typical usage: check, if Eversity API is online."
+      tags:
+        - Technical
+      responses:
+        '200':
+          description: Server is online and capable of serving requests
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Pong!

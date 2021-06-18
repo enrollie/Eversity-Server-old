@@ -12,11 +12,13 @@ package by.enrollie.eversity
 import by.enrollie.eversity.controllers.AuthController
 import by.enrollie.eversity.controllers.Registrar
 import by.enrollie.eversity.database.initDatabase
-import by.enrollie.eversity.database.validTokensList
+import by.enrollie.eversity.database.validTokensSet
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
+import by.enrollie.eversity.routes.configurePingRouting
 import by.enrollie.eversity.routes.registerAuthRoute
+import by.enrollie.eversity.routes.registerClassesRoute
 import by.enrollie.eversity.routes.registerUsersRoute
 import by.enrollie.eversity.security.EversityJWT
 import io.ktor.application.*
@@ -32,9 +34,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.joda.time.DateTime
 import org.joda.time.Minutes
+import java.util.*
 import java.util.concurrent.TimeUnit
 
-const val EVERSITY_PUBLIC_NAME = "Eversity v0.0.1-alpha4"
+var EVERSITY_PUBLIC_NAME = "Eversity "
+private var EVERSITY_VERSION = ""
+var EVERSITY_BUILD_DATE = ""
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 
 /**
@@ -65,6 +70,13 @@ fun Application.module(testing: Boolean = false) {
         gson {
         }
     }
+    kotlin.run {
+        val props = Properties()
+        props.load(this.javaClass.getResourceAsStream("/application.properties"))
+        EVERSITY_VERSION = props.getProperty("appVersion")
+        EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
+        EVERSITY_BUILD_DATE = props.getProperty("buildDate")
+    }
     configureBanner()
     //JWT generator initialization
     val secretJWT = this.environment.config.config("jwt").property("secret").getString()
@@ -86,6 +98,8 @@ fun Application.module(testing: Boolean = false) {
     configSubdomainURL = environment.config.config("schools").propertyOrNull("subdomain")?.getString()
     configureAuthentication()
     configureHTTP()
+    configurePingRouting()
+    registerClassesRoute()
     registerAuthRoute()
     registerUsersRoute()
 
@@ -100,7 +114,7 @@ fun Application.module(testing: Boolean = false) {
         //Periodically clears valid tokens cache (to ensure some kind of security)
         //Periodicity is set by tokenCacheValidityMinutes variable
         var removedCount = 0
-        validTokensList.removeIf {
+        validTokensSet.removeIf {
             if (Minutes.minutesBetween(it.third, DateTime.now()).minutes >= tokenCacheValidityMinutes) {
                 removedCount++
                 true

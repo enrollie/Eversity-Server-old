@@ -1,10 +1,11 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.text.SimpleDateFormat
+import java.util.*
 
 val ktorVersion: String by project
 val kotlinVersion: String by project
 val logbackVersion: String by project
 val exposedVersion: String by project
-val multikVersion: String by project
 
 plugins {
     application
@@ -13,11 +14,20 @@ plugins {
     id("com.github.johnrengelman.shadow") version "6.1.0"
 }
 
-group = "by.enrollie.educad"
-version = "0.0.1"
+group = "by.enrollie.eversity"
+version = getGitVersion()
 application {
     mainClass.set("io.ktor.server.netty.EngineMain")
     mainClassName = "io.ktor.server.netty.EngineMain"
+}
+
+fun getGitVersion(): String {
+    val os = org.apache.commons.io.output.ByteArrayOutputStream()
+    project.exec {
+        commandLine = "git describe --tags --long".split(" ")
+        standardOutput = os
+    }
+    return String(os.toByteArray()).trim()
 }
 
 repositories {
@@ -53,9 +63,9 @@ dependencies {
     //----OTHER DEPENDENCIES
     implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.16.0")
-    implementation("org.jetbrains.kotlinx:multik-api:$multikVersion")
+    implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
-    implementation(files("libs/ktor-banner.jar"))
+    implementation("team.yi.ktor:ktor-banner:0.2.0")
     //----END OF OTHER DEPENDENCIES
 
     //----TEST DEPENDENCIES
@@ -70,6 +80,16 @@ val compileKotlin: KotlinCompile by tasks
 compileKotlin.kotlinOptions {
     jvmTarget = "1.8"
 }
+compileKotlin.dependsOn.add((tasks.getByName("processResources") as ProcessResources).apply {
+    filesMatching("application.properties") {
+        val props = mutableMapOf<String, String>()
+        props["appVersion"] = getGitVersion()
+        val formatter = SimpleDateFormat("YYYY-MM-dd E, HH:mm:ss-SS")
+        props["buildDate"] = formatter.format(Calendar.getInstance().time)
+        expand(props)
+    }
+})
+
 val compileTestKotlin: KotlinCompile by tasks
 compileTestKotlin.kotlinOptions {
     jvmTarget = "1.8"

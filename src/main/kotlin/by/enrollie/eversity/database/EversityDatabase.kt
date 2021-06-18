@@ -19,34 +19,43 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.batchInsert
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 import org.joda.time.Minutes
+import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * Temporary cache of valid access tokens.
  */
-var validTokensList = mutableListOf<Triple<Int, String, DateTime>>()
+var validTokensSet = mutableSetOf<Triple<Int, String, DateTime>>()
 
 /**
  * Temporary cache for users (their types and ID's)
  */
-private var usersCacheList = mutableListOf<Pair<User, DateTime>>()
+private var usersCacheSet = mutableSetOf<Pair<User, DateTime>>()
 
 /**
  * Temporary cache for pupils data
  */
-private var pupilsCacheList = mutableListOf<Pair<Pupil, DateTime>>()
+private var pupilsCacheSet = mutableSetOf<Pupil>()
+
+/**
+ * Temporary cache for teachers data.
+ * First element is a teacher and second element is their class ID (if teacher is a class teacher) or null
+ */
+private var teachersCacheSet = mutableSetOf<Pair<Teacher, Int?>>()
 
 /**
  * Temporary cache for user's credentials
  */
-private var credentialsCacheList = mutableListOf<Triple<Int, Pair<String?, String?>, String>>()
+private var credentialsCacheSet = mutableSetOf<Triple<Int, Pair<String?, String?>, String>>()
+
+/**
+ *
+ */
+private val classesCacheSet = mutableSetOf<SchoolClass>()
 
 
 /**
@@ -60,7 +69,7 @@ object EversityDatabase {
      * @return true, if user exists. false otherwise
      */
     fun doesUserExist(userID: Int): Boolean {
-        if (usersCacheList.find {
+        if (usersCacheSet.find {
                 it.first.id == userID
             } != null) {
             return true
@@ -69,7 +78,7 @@ object EversityDatabase {
             Users.select { Users.id eq userID }.toList()
         }
         if (tos.isNotEmpty())
-            GlobalScope.launch { usersCacheList.add(Pair(User(userID, getUserType(userID)), DateTime.now())) }
+            GlobalScope.launch { usersCacheSet.add(Pair(User(userID, getUserType(userID)), DateTime.now())) }
         return tos.isNotEmpty()
     }
 
@@ -117,6 +126,7 @@ object EversityDatabase {
                 it[this.classID] = classID
             }
         }
+        teachersCacheSet.add(Pair(Teacher(userID, fullName.first, fullName.second, fullName.third), classID))
         insertOrUpdateCredentials(userID, Triple(cookies.first, cookies.second, tokenAPI))
         return true
     }
@@ -151,8 +161,6 @@ object EversityDatabase {
         return true
     }
 
-    fun registerPupil(pupil: Pupil) = registerPupil(pupil.id, Pair(pupil.firstName, pupil.lastName), pupil.classID)
-
     /**
      * Registers many pupils at once. (does not register their timetables).
      * Ignores pupil if it already exists.
@@ -161,7 +169,7 @@ object EversityDatabase {
     fun registerManyPupils(array: Array<Pupil>) {
         val list = array.toList()
         transaction {
-            Users.batchInsert(list, shouldReturnGeneratedValues = false,ignore = true) { pupil ->
+            Users.batchInsert(list, shouldReturnGeneratedValues = false, ignore = true) { pupil ->
                 this[Users.id] = pupil.id
                 this[Users.type] = APIUserType.Pupil.name
             }
@@ -172,6 +180,7 @@ object EversityDatabase {
                 this[Pupils.classID] = pupil.classID
             }
         }
+
     }
 
     /**
@@ -238,7 +247,7 @@ object EversityDatabase {
                 it[token] = issuedToken
             }
         }
-        validTokensList.add(Triple(userID, issuedToken, DateTime.now()))
+        validTokensSet.add(Triple(userID, issuedToken, DateTime.now()))
         return issuedToken
     }
 
@@ -272,7 +281,7 @@ object EversityDatabase {
                 }
             }
         }
-        validTokensList.removeIf {
+        validTokensSet.removeIf {
             it.first == userID
         }
         return invalidationSize
@@ -286,7 +295,7 @@ object EversityDatabase {
      * @return If token is found and it is not banned, returns (true, null). If token is found, but it is banned, returns (false, reason of ban). If token is not found, returns (false,null).
      */
     fun checkToken(userID: Int, token: String): Pair<Boolean, String?> {
-        if (validTokensList.find {
+        if (validTokensSet.find {
                 it.first == userID && it.second == token && Minutes.minutesBetween(
                     it.third,
                     DateTime.now()
@@ -301,7 +310,7 @@ object EversityDatabase {
             }.toList().isNotEmpty()
         }
         if (foundInValid) {
-            validTokensList.add(Triple(userID, token, DateTime.now()))
+            validTokensSet.add(Triple(userID, token, DateTime.now()))
             return Pair(true, null)
         }
         return Pair(false, null)
@@ -330,7 +339,7 @@ object EversityDatabase {
         if (!doesUserExist(userID)) {
             throw UserNotRegistered("User with ID $userID does not exist")
         }
-        val cachedCredentials = credentialsCacheList.find {
+        val cachedCredentials = credentialsCacheSet.find {
             it.first == userID
         }
         if (cachedCredentials != null) {
@@ -346,7 +355,7 @@ object EversityDatabase {
         }
         val credentials =
             credentialsList.firstOrNull() ?: throw NoSuchElementException("Credentials first element is null")
-        credentialsCacheList.add(
+        credentialsCacheSet.add(
             Triple(
                 userID, Pair(
                     credentials[Credentials.csrfToken],
@@ -372,16 +381,13 @@ object EversityDatabase {
         if (!doesUserExist(userID)) {
             throw UserNotRegistered("User with ID $userID does not exist")
         }
-        credentialsCacheList.removeIf {
+        credentialsCacheSet.removeIf {
             it.first == userID
         }
-        val deletedCredentials = transaction {
+        transaction {
             Credentials.deleteWhere {
                 Credentials.id eq userID
             }
-        }
-        //TODO: Add logging
-        transaction {
             Credentials.insert {
                 it[id] = userID
                 it[csrfToken] = credentials.first
@@ -389,7 +395,7 @@ object EversityDatabase {
                 it[token] = credentials.third
             }
         }
-        credentialsCacheList.add(Triple(userID, Pair(credentials.first, credentials.second), credentials.third))
+        credentialsCacheSet.add(Triple(userID, Pair(credentials.first, credentials.second), credentials.third))
     }
 
     /**
@@ -398,13 +404,15 @@ object EversityDatabase {
      * @param classID ID of class
      * @param classTeacherID ID of class teacher (does not need to be registered)
      */
-    fun registerClass(classID: Int, classTeacherID: Int) {
+    fun registerClass(classID: Int, classTeacherID: Int, name: String, isSecondShift: Boolean) {
         if (doesClassExist(classID))
             return
         transaction {
             Classes.insert {
                 it[this.classID] = classID
                 it[this.classTeacher] = classTeacherID
+                it[this.name] = name
+                it[this.isSecondShift] = isSecondShift
             }
         }
         return
@@ -445,15 +453,15 @@ object EversityDatabase {
      */
     fun shouldUpdateClass(classID: Int): Boolean {
         val classExisting = doesClassExist(classID)
-        val existingPupils = transaction {
-            Pupils.select {
-                Pupils.classID eq classID
-            }.toList().isNotEmpty()
-        }
-        val existingTimetable = transaction {
-            ClassTimetables.select {
-                ClassTimetables.id eq classID
-            }.toList().isNotEmpty()
+        val (existingPupils, existingTimetable) = transaction {
+            Pair(
+                Pupils.select {
+                    Pupils.classID eq classID
+                }.toList().isNotEmpty(),
+                ClassTimetables.select {
+                    ClassTimetables.id eq classID
+                }.toList().isNotEmpty()
+            )
         }
         if (classExisting) {
             if (existingPupils) {
@@ -467,9 +475,10 @@ object EversityDatabase {
     /**
      * Returns user's type
      * @param userID User's ID
+     * @throws UserNotRegistered Thrown, if user is not registered
      */
     fun getUserType(userID: Int): APIUserType {
-        val cachedUser = usersCacheList.find {
+        val cachedUser = usersCacheSet.find {
             it.first.id == userID && Minutes.minutesBetween(
                 it.second,
                 DateTime.now()
@@ -498,9 +507,9 @@ object EversityDatabase {
         }
         if (getUserType(userID) != APIUserType.Pupil)
             throw IllegalArgumentException("User with ID $userID is not a pupil (they are ${getUserType(userID)}, in fact)")
-        val cachedPupil = pupilsCacheList.find {
-            it.first.id == userID
-        }?.first
+        val cachedPupil = pupilsCacheSet.find {
+            it.id == userID
+        }
         if (cachedPupil != null)
             return cachedPupil.classID
         val classIDElement = transaction {
@@ -538,7 +547,7 @@ object EversityDatabase {
         if (!doesUserExist(userID)) {
             return false
         }
-        validTokensList.removeIf {
+        validTokensSet.removeIf {
             it.first == userID && it.second == token
         }
         transaction {
@@ -568,25 +577,23 @@ object EversityDatabase {
         }
         return when (type) {
             APIUserType.Pupil -> {
-                val cachedPupil = pupilsCacheList.find {
-                    it.first.id == userID
+                val cachedPupil = pupilsCacheSet.find {
+                    it.id == userID
                 }
                 if (cachedPupil != null)
-                    return Triple(cachedPupil.first.firstName, null, cachedPupil.first.lastName)
+                    return Triple(cachedPupil.firstName, null, cachedPupil.lastName)
                 val pupil = transaction {
                     Pupils.select {
                         Pupils.id eq userID
                     }.toList().firstOrNull()
                 }
                     ?: throw NoSuchElementException("Pupil with ID $userID was not found in Pupils database. Are you sure that user with ID $userID is a pupil?")
-                pupilsCacheList.add(
-                    Pair(
-                        Pupil(
-                            userID,
-                            pupil[Pupils.firstName],
-                            pupil[Pupils.lastName],
-                            pupil[Pupils.classID]
-                        ), DateTime.now()
+                pupilsCacheSet.add(
+                    Pupil(
+                        userID,
+                        pupil[Pupils.firstName],
+                        pupil[Pupils.lastName],
+                        pupil[Pupils.classID]
                     )
                 )
                 Triple(pupil[Pupils.firstName], null, pupil[Pupils.lastName])
@@ -652,7 +659,9 @@ object EversityDatabase {
      * @return Map, containing six arrays of lessons (may be unsorted), mapped to six [DayOfWeek]'s (from Monday to Saturday)
      */
     fun getClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
-        if (!doesClassExist(classID)) { throw ClassNotRegistered("Class with ID $classID does not exist") }
+        if (!doesClassExist(classID)) {
+            throw ClassNotRegistered("Class with ID $classID does not exist")
+        }
         val timetableQuery = transaction {
             ClassTimetables.select {
                 ClassTimetables.id eq classID
@@ -682,4 +691,228 @@ object EversityDatabase {
      * @throws IllegalArgumentException Thrown, if pupil is not found in database
      */
     fun getPupilTimetable(userID: Int) = getClassTimetable(getPupilClass(userID))
+
+    fun insertMark(mark: Mark, journalID: Int, lessonID: Int) {
+        require(doesUserExist(mark.pupil.id)) { "Pupil with ID ${mark.pupil.id} does not exist" }
+        require(doesClassExist(mark.pupil.classID)) { "Class with ID ${mark.pupil.classID} does not exist" }
+        transaction {
+            Marks.deleteWhere {
+                Marks.id eq mark.id
+            }
+            Marks.insert {
+                it[id] = mark.id
+                it[value] = mark.markNum
+                it[pupilID] = mark.pupil.id
+                it[classID] = mark.pupil.classID
+                it[date] = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time)
+                it[this.journalID] = journalID
+                it[this.lessonID] = lessonID
+            }
+        }
+    }
+
+    fun batchInsertMarks(marksList: List<Pair<Mark, Pair<Int, Int>>>) {
+        marksList.forEach {
+            require(doesUserExist(it.first.pupil.id)) { "Pupil with ID ${it.first.pupil.id} does not exist" }
+            require(doesClassExist(it.first.pupil.classID)) { "Class with ID ${it.first.pupil.classID} does not exist" }
+        }
+        transaction {
+            Marks.batchInsert(marksList, ignore = true, shouldReturnGeneratedValues = false) {
+                val mark = it.first
+                this[Marks.id] = mark.id
+                this[Marks.value] = mark.markNum
+                this[Marks.pupilID] = mark.pupil.id
+                this[Marks.classID] = mark.pupil.classID
+                this[Marks.date] = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time)
+                this[Marks.journalID] = it.second.first
+                this[Marks.lessonID] = it.second.second
+            }
+        }
+    }
+
+    fun insertAbsence(pupil: Pupil, reason: AbsenceReason, date: DateTime) {
+        require(doesUserExist(pupil.id)) { "Pupil with ID ${pupil.id} does not exist" }
+        require(doesClassExist(pupil.classID)) { "Class with ID ${pupil.classID} does not exist" }
+        transaction {
+            Absences.deleteWhere {
+                Absences.pupilID eq pupil.id
+                Absences.date eq date
+            }
+            Absences.insertIgnore {
+                it[pupilID] = pupil.id
+                it[classID] = pupil.classID
+                it[this.date] = date
+                it[this.reason] = reason.name
+            }
+        }
+    }
+
+    /**
+     * Removes absence from database
+     * @param pupil Pupil to remove absence for
+     * @param date to remove absence
+     */
+    fun removeAbsence(pupil: Pupil, date: DateTime) {
+        transaction {
+            Absences.deleteWhere {
+                Absences.pupilID eq pupil.id
+                Absences.date eq date
+            }
+        }
+    }
+
+    fun getTeacher(teacherID: Int): Pair<Teacher, Int?> {
+        require(doesUserExist(teacherID)) { "User with ID $teacherID does not exist" }
+
+        val teacherData = transaction {
+            Teachers.select {
+                Teachers.id eq teacherID
+            }.firstOrNull()
+        } ?: throw IllegalArgumentException("Teacher with ID $teacherID does not exist")
+        val teacher = Teacher(
+            teacherID,
+            teacherData[Teachers.firstName],
+            teacherData[Teachers.middleName],
+            teacherData[Teachers.lastName]
+        )
+        val classID = teacherData[Teachers.classID]
+        return Pair(teacher, classID)
+    }
+
+    fun validatePupilAccess(pupilID: Int, teacherID: Int): Boolean {
+        require(doesUserExist(pupilID)) { "Pupil with ID $pupilID does not exist" }
+        require(doesUserExist(teacherID)) { "Teacher with ID $teacherID does not exist" }
+        try {
+            val teacher = getTeacher(teacherID)
+            val pupilClass = getPupilClass(pupilID)
+            if (pupilClass != teacher.second)
+                return false
+            return true
+        } catch (e: IllegalArgumentException) {
+            return false
+        }
+    }
+
+    fun batchValidatePupilAccess(pupilsList: List<Int>, teacherID: Int): List<Pair<Int, Boolean>> {
+        val illegalAccessList = mutableListOf<Pair<Int, Boolean>>()
+        pupilsList.forEach {
+            illegalAccessList.add(Pair(it, validatePupilAccess(it, teacherID)))
+        }
+        return illegalAccessList
+    }
+
+    fun getClass(classID: Int): SchoolClass {
+        require(doesClassExist(classID)) { "Class with ID $classID does not exist." }
+        val cachedClass = classesCacheSet.find { it.id == classID }
+        if (cachedClass != null)
+            return cachedClass
+        val (classData, pupilsData) = transaction {
+            return@transaction Pair(
+                Classes.select {
+                    Classes.classID eq classID
+                }.toList().firstOrNull(),
+                Pupils.select {
+                    Pupils.classID eq classID
+                }.toList()
+            )
+        }
+        if (classData == null)
+            throw IllegalStateException("Class data is null")
+        val pupilsList = mutableListOf<Pupil>()
+        pupilsData.forEach {
+            pupilsList.add(
+                Pupil(
+                    it[Pupils.id],
+                    it[Pupils.firstName],
+                    it[Pupils.lastName],
+                    it[Pupils.classID]
+                )
+            )
+        }
+        pupilsCacheSet.addAll(pupilsList)
+        return SchoolClass(
+            classData[Classes.classID],
+            classData[Classes.name],
+            classData[Classes.classTeacher],
+            pupilsList.toTypedArray()
+        )
+    }
+
+    fun getClassPupils(classID: Int): List<Pupil> {
+        require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
+        return transaction {
+            Pupils.select { Pupils.classID eq classID }.toList().map {
+                Pupil(it[Pupils.id], it[Pupils.firstName], it[Pupils.lastName], it[Pupils.classID])
+            }
+        }
+    }
+
+    fun getClassAbsence(classID: Int, startDate: String, endDate: String): Set<Absence> {
+        require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
+        val startDateTime = DateTime.parse(startDate)
+        val endDateTime = DateTime.parse(endDate)
+        return transaction {
+            Absences.select {
+                Absences.classID eq classID
+                Absences.date greaterEq startDateTime
+            }.toList().filter{
+                it[Absences.date] <= endDateTime
+            }.map {
+                Absence(
+                    it[Absences.pupilID],
+                    it[Absences.classID],
+                    it[Absences.date].toString("YYYY-MM-dd"),
+                    try {
+                        AbsenceReason.valueOf(it[Absences.reason])
+                    } catch (e: IllegalArgumentException) {
+                        AbsenceReason.UNKNOWN
+                    }
+                )
+            }.toSet()
+        }
+    }
+
+    fun getClassAbsence(classID: Int, day: String): Set<Absence> {
+        require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
+        val requiredDateTime = DateTime.parse(day)
+        return transaction {
+            Absences.select {
+                Absences.classID eq classID
+                Absences.date eq requiredDateTime
+            }.toList().map {
+                println(it[Absences.date])
+                Absence(
+                    it[Absences.pupilID],
+                    it[Absences.classID],
+                    it[Absences.date].toString("YYYY-MM-dd"),
+                    try {
+                        AbsenceReason.valueOf(it[Absences.reason])
+                    } catch (e: IllegalArgumentException) {
+                        AbsenceReason.UNKNOWN
+                    }
+                )
+            }.toSet()
+        }
+    }
+
+    fun getClassAbsence(classID: Int): Set<Absence> {
+        require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
+        return transaction {
+            Absences.select {
+                Absences.classID eq classID
+                Absences.date eq DateTime.now()
+            }.toList().map {
+                Absence(
+                    it[Absences.pupilID],
+                    it[Absences.classID],
+                    it[Absences.date].toString("YYYY-MM-dd"),
+                    try {
+                        AbsenceReason.valueOf(it[Absences.reason])
+                    } catch (e: IllegalArgumentException) {
+                        AbsenceReason.UNKNOWN
+                    }
+                )
+            }.toSet()
+        }
+    }
 }

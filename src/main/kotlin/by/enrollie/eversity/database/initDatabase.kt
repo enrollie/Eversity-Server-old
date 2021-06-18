@@ -31,7 +31,7 @@ fun initDatabase(
 ) {
     val tables = arrayOf(
         Classes,
-        Absence,
+        Absences,
         ClassTimetables,
         Credentials,
         Pupils,

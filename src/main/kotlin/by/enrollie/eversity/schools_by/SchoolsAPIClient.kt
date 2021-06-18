@@ -155,7 +155,7 @@ class SchoolsAPIClient() {
 
     suspend fun getSummaryForDay(
         userID: String,
-        date: String = SimpleDateFormat("YYYY-mm-dd").format(Calendar.getInstance().time)
+        date: String = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time)
     ): JsonObject {
         if (token == "null") {
             throw IllegalStateException("Token is not initialized! Get it either by using getAPIToken() or by constructing class with it")
