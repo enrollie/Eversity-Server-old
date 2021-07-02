@@ -10,4 +10,10 @@ package by.enrollie.eversity.data_classes
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class APIUserType { Teacher, Parent, Pupil, SYSTEM, Social, Administration }
+data class APIPlaceJob(
+    val pupilID: Int,
+    val classID: Int,
+    val absenceList: List<Pair<Short, Boolean>>,
+    val reason: AbsenceReason,
+    val date: String
+)

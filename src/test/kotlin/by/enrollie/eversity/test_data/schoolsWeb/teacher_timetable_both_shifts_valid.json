@@ -1,0 +1,211 @@
+{
+  "first": {
+    "MONDAY": [
+      {
+        "place": 3,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 41965
+      },
+      {
+        "place": 4,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 59738
+      }
+    ],
+    "TUESDAY": [
+      {
+        "place": 1,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 46499
+      },
+      {
+        "place": 2,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 46499
+      },
+      {
+        "place": 4,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 99996
+      }
+    ],
+    "WEDNESDAY": [],
+    "THURSDAY": [
+      {
+        "place": 1,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 99991
+      },
+      {
+        "place": 2,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 65993
+      },
+      {
+        "place": 3,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 65994
+      },
+      {
+        "place": 4,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 99995
+      },
+      {
+        "place": 5,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 41963
+      }
+    ],
+    "FRIDAY": [
+      {
+        "place": 1,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 99565
+      },
+      {
+        "place": 3,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 99996
+      },
+      {
+        "place": 4,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 99997
+      },
+      {
+        "place": 5,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 41999
+      }
+    ],
+    "SATURDAY": [
+      {
+        "place": 2,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 41964
+      }
+    ]
+  },
+  "second": {
+    "MONDAY": [],
+    "TUESDAY": [
+      {
+        "place": 4,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 17,
+          "startM": 0,
+          "endH": 17,
+          "endM": 45
+        },
+        "classID": 46420
+      },
+      {
+        "place": 5,
+        "title": "Музыка",
+        "schedule": {
+          "startH": 17,
+          "startM": 55,
+          "endH": 18,
+          "endM": 40
+        },
+        "classID": 46424
+      }
+    ],
+    "WEDNESDAY": [],
+    "THURSDAY": [],
+    "FRIDAY": [],
+    "SATURDAY": []
+  }
+}

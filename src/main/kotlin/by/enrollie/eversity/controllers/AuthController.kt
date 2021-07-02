@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.controllers
 
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import by.enrollie.eversity.exceptions.UserNotRegistered
 import by.enrollie.eversity.schools_by.SchoolsAPIClient
@@ -44,7 +44,7 @@ class AuthController {
         val schoolsToken = schoolsAPI.getAPIToken(username, password) ?: throw AuthorizationUnsuccessful()
         val userData = schoolsAPI.getCurrentUserData()
         val userID = userData["id"].toString().toInt()
-        if (EversityDatabase.doesUserExist(userID)) {
+        if (doesUserExist(userID)) {
             return loginUser(username, password)
         }
         val credentials = schoolsWeb.login(username, password)
@@ -58,7 +58,7 @@ class AuthController {
                     throw unknownError
                 }.toString().toInt()
                 val className = pupilData["class_name"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
-                if (!EversityDatabase.doesClassExist(classID)) {
+                if (!doesClassExist(classID)) {
                     try {
                         registrar.registerClass(classID, className, schoolsWeb)
                     } catch (e: IllegalArgumentException) {
@@ -66,7 +66,7 @@ class AuthController {
                         throw UnknownError("Schools web wrapper has invalid cookies")
                     }
                 }
-                EversityDatabase.registerPupil(
+                registerPupil(
                     userID,
                     Pair(
                         userData["first_name"]?.jsonPrimitive?.content.toString(),
@@ -74,11 +74,11 @@ class AuthController {
                     ),
                     classID
                 )
-                EversityDatabase.insertOrUpdateCredentials(
+                insertOrUpdateCredentials(
                     userID,
                     Triple(credentials.first, credentials.second, schoolsToken)
                 )
-                val eversityToken = EversityDatabase.issueToken(userID)
+                val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
             "Teacher" -> {
@@ -99,7 +99,7 @@ class AuthController {
                         className = className.replace("-го", "")
                     }
                     registrar.registerClass(classStr, className, schoolsWeb)
-                    EversityDatabase.registerTeacher(
+                    registerTeacher(
                         userID,
                         Triple(
                             userData["first_name"]?.jsonPrimitive?.content.toString(),
@@ -111,7 +111,7 @@ class AuthController {
                         classStr
                     )
                 } else {
-                    EversityDatabase.registerTeacher(
+                    registerTeacher(
                         userID,
                         Triple(
                             userData["first_name"]?.jsonPrimitive?.content.toString(),
@@ -123,7 +123,27 @@ class AuthController {
                     )
                 }
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
-                val eversityToken = EversityDatabase.issueToken(userID)
+                val eversityToken = issueToken(userID)
+                return EversityJWT.instance.sign(userID.toString(), eversityToken)
+            }
+            "Parent"->{
+                registerParent(userID)
+                val eversityToken = issueToken(userID)
+                return EversityJWT.instance.sign(userID.toString(), eversityToken)
+            }
+            "Administration"->{
+                registerAdministration(
+                    userID,
+                    Triple(
+                        userData["first_name"]?.jsonPrimitive?.content.toString(),
+                        userData["father_name"]?.jsonPrimitive?.content.toString(),
+                        userData["last_name"]?.jsonPrimitive?.content.toString()
+                    ),
+                    credentials,
+                    schoolsToken
+                )
+                registrar.registerTeacherTimetable(userID, schoolsWeb)
+                val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
             else -> {
@@ -139,16 +159,16 @@ class AuthController {
         val schoolsToken = schoolsAPI.getAPIToken(username, password) ?: throw AuthorizationUnsuccessful()
         val userData = schoolsAPI.getCurrentUserData()
         val userID = userData["id"].toString().toInt()
-        if (!EversityDatabase.doesUserExist(userID)) {
+        if (!doesUserExist(userID)) {
             throw UserNotRegistered("User with ID $userID is not registered")
         }
         try {
-            val credentials = EversityDatabase.obtainCredentials(userID)
+            val credentials = obtainCredentials(userID)
             if (credentials.first != null && credentials.second != null) {
                 if (!schoolsWeb.validateCookies(Pair(credentials.first!!, credentials.second!!), true)) {
                     logger.debug("Credentials of user with ID $userID were invalid, recreating...")
                     val newCredentials = schoolsWeb.login(username, password)
-                    EversityDatabase.insertOrUpdateCredentials(
+                    insertOrUpdateCredentials(
                         userID,
                         Triple(newCredentials.first, newCredentials.second, schoolsToken)
                     )
@@ -183,18 +203,18 @@ class AuthController {
             throw UnknownError()
         } catch (e: NoSuchElementException) {
             val newCredentials = schoolsWeb.login(username, password)
-            EversityDatabase.insertOrUpdateCredentials(
+            insertOrUpdateCredentials(
                 userID,
                 Triple(newCredentials.first, newCredentials.second, schoolsToken)
             )
         } catch (e: IllegalStateException) {
             val newCredentials = schoolsWeb.login(username, password)
-            EversityDatabase.insertOrUpdateCredentials(
+            insertOrUpdateCredentials(
                 userID,
                 Triple(newCredentials.first, newCredentials.second, schoolsToken)
             )
         }
-        val token = EversityDatabase.issueToken(userID)
+        val token = issueToken(userID)
         return EversityJWT.instance.sign(userID.toString(), token)
     }
 }

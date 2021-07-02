@@ -40,7 +40,8 @@ fun initDatabase(
         TeachersTimetable,
         Tokens,
         Users,
-        Marks
+        Marks,
+        TelegramNotifyData
     )
 
     Database.connect(

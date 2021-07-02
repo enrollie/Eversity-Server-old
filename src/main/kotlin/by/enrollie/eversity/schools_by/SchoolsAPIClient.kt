@@ -8,22 +8,21 @@
 package by.enrollie.eversity.schools_by
 
 import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.data_classes.Pupil
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
+import org.slf4j.Logger
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.naming.AuthenticationException
 
 /**
- * Wrapper of Schools.by API, using KTor
+ * Wrapper of "Schools.by" API, using KTor
  *
  * @author Pavel Matusevich (Neitex)
  * @constructor Constructs wrapper class without initializing token.
@@ -33,10 +32,12 @@ class SchoolsAPIClient() {
     private var token: String = "null"
     private var userType: APIUserType? = null
 
+    private val logger: Logger = org.slf4j.LoggerFactory.getLogger("Schools.by")
+
     private var client = HttpClient {
         expectSuccess = false
         defaultRequest {
-//            headers.append("Authorization", "Token $token")
+            headers.append("Authorization", "Token $token")
             timeout {
                 this.connectTimeoutMillis = 1000
                 this.requestTimeoutMillis = 1000
@@ -46,7 +47,7 @@ class SchoolsAPIClient() {
     }
 
     /**
-     * Constructs Schools.by API wrapper with predefined API token
+     * Constructs "Schools.by" API wrapper with predefined API token
      *
      * @property token Schools.by API token string
      *
@@ -57,7 +58,7 @@ class SchoolsAPIClient() {
     }
 
     /**
-     * Constructs Schools.by API wrapper with predefined API token and user type
+     * Constructs "Schools.by" API wrapper with predefined API token and user type
      *
      * @property token Schools.by API token string
      * @property UserType Type of user
@@ -71,7 +72,7 @@ class SchoolsAPIClient() {
 
 
     /**
-     * Gets Schools.by API token by username and password
+     * Gets "Schools.by" API token by username and password
      *
      * @param username Schools.by username
      * @param password Schools.by password
@@ -79,30 +80,24 @@ class SchoolsAPIClient() {
      * @return Schools.by token, else null if password is wrong
      */
     suspend fun getAPIToken(username: String, password: String): String? {
-        client = client.config {
-            defaultRequest {
-            }
-        }
+        val tempClient = HttpClient()
         val credentialsJSON = JsonObject(
             mapOf(
                 "username" to Json.parseToJsonElement("\"$username\""),
                 "password" to Json.parseToJsonElement("\"$password\"")
             )
         )
-        val resp = client.request<HttpResponse> {
-            method = HttpMethod.Post
-            this.contentType(ContentType.Application.Json)
-            this.url.takeFrom("https://schools.by/api/auth")
-            this.body = credentialsJSON.toString()
+        val resp = tempClient.use {
+            it.request<HttpResponse> {
+                method = HttpMethod.Post
+                this.contentType(ContentType.Application.Json)
+                this.url.takeFrom("https://schools.by/api/auth")
+                this.body = credentialsJSON.toString()
+            }
         }
         val response = Json.parseToJsonElement(String(resp.readBytes())).jsonObject
         return if (response.containsKey("token")) {
             token = response.getValue("token").jsonPrimitive.content
-            client = client.config {
-                defaultRequest {
-                    headers.append("Authorization", "Token $token")
-                }
-            }
             token
         } else {
             null
@@ -170,12 +165,16 @@ class SchoolsAPIClient() {
                 return Json.parseToJsonElement(responseString).jsonObject
             }
             HttpStatusCode.Unauthorized -> {
+                logger.debug("Schools.by API returned HTTP Code 500 (Unauthorized)")
                 throw AuthenticationException("Schools.by did not accept this token. Are you sure you have permission to access this pupil?")
             }
             HttpStatusCode.InternalServerError -> {
+                logger.error("Schools.by API returned HTTP Code 500 (Internal Server Error)")
                 throw UnknownError("Schools.by returned HTTP Code 500 (Internal Server Error)")
             }
             else -> {
+                logger.error("Schools.by API returned unknown HTTP code (${response.status.value} (${response.status.description}))")
+                logger.debug("Returned message: ${response.receive<String>()}")
                 throw UnknownError("Schools.by returned HTTP Code ${response.status.value} (${response.status.description})")
             }
         }
@@ -223,7 +222,7 @@ class SchoolsAPIClient() {
      *
      * @throws UnknownError Thrown, when Schools.by returned non-200 HTTP code
      */
-    suspend fun getCurrentQuarter():JsonObject{
+    suspend fun getCurrentQuarter(): JsonObject {
         val response = client.request<HttpResponse> {
             method = HttpMethod.Get
             headers.clear()
@@ -235,6 +234,39 @@ class SchoolsAPIClient() {
                 return Json.parseToJsonElement(responseString).jsonObject
             }
             else -> throw UnknownError("Schools.by returned HTTP code ${response.status.value} (${response.status.description})")
+        }
+    }
+
+    /**
+     * Fetches parent's pupils. As Schools.by did not bother with security, it does not require authorization (token)
+     * @param parentID ID of parent
+     * @return List of given parent's pupils
+     * @throws UnknownError Thrown, if Schools.by returned non-200 HTTP code
+     */
+    suspend fun fetchParentsPupils(parentID: Int): List<Pupil> {
+        val response = HttpClient().use {
+            it.request<HttpResponse> {
+                method = HttpMethod.Get
+                url.takeFrom("https://schools.by/subdomain-api/parent/$parentID/pupils")
+            }
+        }
+        when (response.status) {
+            HttpStatusCode.OK -> {
+                val responseString = response.receive<String>()
+                val responseJSON = Json.parseToJsonElement(responseString).jsonArray
+                return responseJSON.map {
+                    val pupilData = it.jsonObject
+                    Pupil(
+                        pupilData["id"]?.jsonPrimitive?.int!!,
+                        pupilData["first_name"]?.jsonPrimitive?.content.toString(),
+                        pupilData["last_name"]?.jsonPrimitive?.content.toString(),
+                        pupilData["class_id"]?.jsonPrimitive?.int!!
+                    )
+                }
+            }
+            else -> {
+                throw UnknownError("Schools.by returned HTTP code ${response.status.value} (${response.status.description})")
+            }
         }
     }
 }

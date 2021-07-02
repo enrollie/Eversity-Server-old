@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2021.
+# Author: Pavel Matusevich.
+# Licensed under GNU AGPLv3.
+# All rights are reserved.
+#
+
+#Шаблон файла именований школы (School naming file template)
+#Nominative – именительный падеж
+#Genitive – родительный падеж
+#Dative – дательный падеж
+#Accusative – винительный падеж
+#Instrumental – творительный падеж
+#Prepositional – предложный падеж
+#Location - место (где?)
+
+nominative=Средняя школа №000 г. <города>
+genitive=Средней школы №000 г. <города>
+dative=Средней школе №000 г. <города>
+accusative=Среднюю школу №000 г. <города>
+instrumental=Средней школой №000 г. <города>
+prepositional=о Средней школе №000 г. <города>
+location=в Средней школе №000 г. <города>

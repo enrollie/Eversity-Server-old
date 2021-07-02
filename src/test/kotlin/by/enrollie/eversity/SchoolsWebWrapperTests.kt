@@ -23,9 +23,10 @@ import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class SchoolsWebWrapperTests {
-    private val testDataBasePath = "src/test/kotlin/by/enrollie/eversity/test_data/schoolsWeb"
+    private val testDataPath = "src/test/kotlin/by/enrollie/eversity/test_data/schoolsWeb"
 
     private val client = HttpClient(MockEngine) {
         engine {
@@ -34,7 +35,7 @@ class SchoolsWebWrapperTests {
                     request.url.fullPath.contains(
                         "/class/1" //test data for class timetable parser
                     ) -> {
-                        val file = File("$testDataBasePath/class_timetable.html")
+                        val file = File("$testDataPath/class_timetable.html")
                         if (!file.exists()) {
                             throw IllegalArgumentException("Class timetable sample data is not found (path: \"${file.absolutePath}\")")
                         }
@@ -43,7 +44,7 @@ class SchoolsWebWrapperTests {
                     request.url.fullPath.contains(
                         "class/2" //test data for class teacher parser
                     ) -> {
-                        val file = File("$testDataBasePath/class_page.html")
+                        val file = File("$testDataPath/class_page.html")
                         if (!file.exists()) {
                             throw IllegalArgumentException("Class page sample data is not found (path: \"${file.absolutePath}\")")
                         }
@@ -52,16 +53,23 @@ class SchoolsWebWrapperTests {
                     request.url.fullPath.contains(
                         "teacher/1"
                     ) -> {
-                        val file = File("$testDataBasePath/teacher_timetable.html")
+                        val file = File("$testDataPath/teacher_timetable.html")
                         if (!file.exists()) {
                             throw IllegalArgumentException("Teacher timetable sample data is not found (path: \"${file.absolutePath}\")")
                         }
                         respond(file.readBytes())
                     }
                     request.url.fullPath.contains("class/3") -> {
-                        val file = File("$testDataBasePath/pupils_list.html")
+                        val file = File("$testDataPath/pupils_list.html")
                         if (!file.exists()) {
                             throw IllegalArgumentException("Pupils list sample data is not found (path: \"${file.absolutePath}\")")
+                        }
+                        respond(file.readBytes())
+                    }
+                    request.url.fullPath.contains("teacher/2") -> {
+                        val file = File("$testDataPath/teacher_timetable_both_shifts.html")
+                        if (!file.exists()) {
+                            throw IllegalArgumentException("Teacher with both shifts timetable sample data is not found (path: \"${file.absolutePath}\")")
                         }
                         respond(file.readBytes())
                     }
@@ -84,7 +92,7 @@ class SchoolsWebWrapperTests {
     @Test
     fun testClassTimetableParser() {
         runBlocking {
-            val validResponseFile = File("$testDataBasePath/class_timetable_valid.json")
+            val validResponseFile = File("$testDataPath/class_timetable_valid.json")
             if (!validResponseFile.exists()) {
                 throw IllegalArgumentException("Valid result for class timetable is not found (path: \"${validResponseFile.absolutePath}\")")
             }
@@ -101,21 +109,43 @@ class SchoolsWebWrapperTests {
     @Test
     fun testTeacherTimetableParser() {
         runBlocking {
-            val validResponseFile = File("$testDataBasePath/teacher_timetable_valid.json")
+            val validResponseFile = File("$testDataPath/teacher_timetable_valid.json")
+            if (!validResponseFile.exists()) {
+                throw IllegalArgumentException("Valid result for teacher timetable is not found (path: \"${validResponseFile.absolutePath}\")")
+            }
+            val responseMap = SchoolsWebWrapper(client).fetchTeacherTimetable(1)
+
+            val validMap =
+                Json.decodeFromString<Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?>>(
+                    String(validResponseFile.readBytes())
+                )
+            assertEquals(Json.encodeToString(validMap.first), Json.encodeToString(responseMap.first))
+            assertEquals(null, responseMap.second)
+        }
+    }
+
+    @Test
+    fun testTeacherTimetableParserBothShifts() {
+        runBlocking {
+            val validResponseFile = File("$testDataPath/teacher_timetable_both_shifts_valid.json")
             if (!validResponseFile.exists()) {
                 throw IllegalArgumentException("Valid result for teacher timetable is not found (path: \"${validResponseFile.absolutePath}\")")
             }
             val validMap =
-                Json.decodeFromString<Map<DayOfWeek, Array<TeacherLesson>>>(String(validResponseFile.readBytes()))
-            val responseMap = SchoolsWebWrapper(client).fetchTeacherTimetable(1)
-            assertEquals(Json.encodeToString(validMap), Json.encodeToString(responseMap))
+                Json.decodeFromString<Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?>>(
+                    String(validResponseFile.readBytes())
+                )
+            val responseMap = SchoolsWebWrapper(client).fetchTeacherTimetable(2)
+            assertEquals(Json.encodeToString(validMap.first), Json.encodeToString(responseMap.first))
+            assertEquals(Json.encodeToString(validMap.second), Json.encodeToString(validMap.second))
+            assertNotNull(validMap.second)
         }
     }
 
     @Test
     fun testPupilListParser() {
         runBlocking {
-            val validResponseFile = File("$testDataBasePath/pupils_list_valid.json")
+            val validResponseFile = File("$testDataPath/pupils_list_valid.json")
             if (!validResponseFile.exists()) {
                 throw IllegalArgumentException("Valid result for pupils list is not found (path: \"${validResponseFile.absolutePath}\")")
             }

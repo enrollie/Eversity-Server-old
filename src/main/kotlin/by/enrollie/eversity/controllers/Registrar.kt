@@ -7,7 +7,9 @@
 
 package by.enrollie.eversity.controllers
 
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.registerClassTimetable
+import by.enrollie.eversity.database.functions.registerManyPupils
+import by.enrollie.eversity.database.functions.shouldUpdateClass
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.util.*
 import org.slf4j.Logger
@@ -41,7 +43,7 @@ class Registrar {
             logger.error(illegalArgumentException)
             throw illegalArgumentException
         }
-        if (!EversityDatabase.shouldUpdateClass(classID))
+        if (!shouldUpdateClass(classID))
             return false
         val classTeacherID = schoolsWebWrapper.fetchClassForTeacher(classID)
         val classTimetable = schoolsWebWrapper.fetchClassTimetable(classID)
@@ -54,9 +56,9 @@ class Registrar {
                 break
             }
         }
-        EversityDatabase.registerClass(classID, classTeacherID, className, isSecondShift)
-        EversityDatabase.registerClassTimetable(classID, classTimetable)
-        EversityDatabase.registerManyPupils(pupilsArray)
+        by.enrollie.eversity.database.functions.registerClass(classID, classTeacherID, className, isSecondShift)
+        registerClassTimetable(classID, classTimetable)
+        registerManyPupils(pupilsArray)
         return true
     }
 
@@ -70,11 +72,10 @@ class Registrar {
             val illegalArgumentException =
                 IllegalArgumentException("Cookies are wrong (cookies validator returned false)")
             logger.error(illegalArgumentException)
-            //TODO: Throw some kind of "not a class teacher exception"
             throw illegalArgumentException
         }
         val timetable = schoolsWebWrapper.fetchTeacherTimetable(userID)
-        EversityDatabase.registerTeacherTimetable(userID, timetable)
+        by.enrollie.eversity.database.functions.registerTeacherTimetable(userID, timetable)
         return true
     }
 }

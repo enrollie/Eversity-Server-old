@@ -9,7 +9,10 @@ package by.enrollie.eversity.controllers
 
 import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.data_classes.User
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.getPupilClass
+import by.enrollie.eversity.database.functions.obtainCredentials
+import by.enrollie.eversity.database.functions.registerClassTimetable
+import by.enrollie.eversity.database.functions.registerTeacherTimetable
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 
 class DataController {
@@ -25,7 +28,7 @@ class DataController {
         when (user.type) {
             APIUserType.Pupil -> {
                 val credentials = try {
-                    EversityDatabase.obtainCredentials(user.id)
+                    obtainCredentials(user.id)
                 } catch (e: NoSuchElementException) {
                     //TODO: Add finding of appropriate credentials in other user's
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
@@ -37,13 +40,13 @@ class DataController {
                 if (!validity) {
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
-                val classID = EversityDatabase.getPupilClass(user.id)
+                val classID = getPupilClass(user.id)
                 val classTimetable = wrapper.fetchClassTimetable(classID)
-                EversityDatabase.registerClassTimetable(classID, classTimetable)
+                registerClassTimetable(classID, classTimetable)
             }
             APIUserType.Teacher -> {
                 val credentials = try {
-                    EversityDatabase.obtainCredentials(user.id)
+                    obtainCredentials(user.id)
                 } catch (e: NoSuchElementException) {
                     //TODO: Add finding of appropriate credentials in other user's
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
@@ -56,7 +59,7 @@ class DataController {
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
                 val timetable = wrapper.fetchTeacherTimetable(user.id)
-                EversityDatabase.registerTeacherTimetable(user.id, timetable)
+                registerTeacherTimetable(user.id, timetable)
             }
             else -> {
                 return

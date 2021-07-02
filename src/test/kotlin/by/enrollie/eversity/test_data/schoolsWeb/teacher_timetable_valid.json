@@ -1,300 +1,303 @@
 {
-  "MONDAY": [
-    {
-      "place": 2,
-      "title": "Биология",
-      "schedule": {
-        "startH": 10,
-        "startM": 0,
-        "endH": 10,
-        "endM": 45
+  "first": {
+    "MONDAY": [
+      {
+        "place": 2,
+        "title": "Биология",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 26218
       },
-      "classID": 26218
-    },
-    {
-      "place": 3,
-      "title": "Биология",
-      "schedule": {
-        "startH": 11,
-        "startM": 0,
-        "endH": 11,
-        "endM": 45
+      {
+        "place": 3,
+        "title": "Биология",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 26215
       },
-      "classID": 26215
-    },
-    {
-      "place": 5,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 0,
-        "endH": 13,
-        "endM": 45
+      {
+        "place": 5,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 26217
       },
-      "classID": 26217
-    },
-    {
-      "place": 6,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 55,
-        "endH": 14,
-        "endM": 40
+      {
+        "place": 6,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        },
+        "classID": 26216
+      }
+    ],
+    "TUESDAY": [
+      {
+        "place": 1,
+        "title": "Биология",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 24268
       },
-      "classID": 26216
-    }
-  ],
-  "TUESDAY": [
-    {
-      "place": 1,
-      "title": "Биология",
-      "schedule": {
-        "startH": 9,
-        "startM": 0,
-        "endH": 9,
-        "endM": 45
+      {
+        "place": 2,
+        "title": "Биология",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 26519
       },
-      "classID": 24268
-    },
-    {
-      "place": 2,
-      "title": "Биология",
-      "schedule": {
-        "startH": 10,
-        "startM": 0,
-        "endH": 10,
-        "endM": 45
+      {
+        "place": 3,
+        "title": "Биология",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 26520
       },
-      "classID": 26519
-    },
-    {
-      "place": 3,
-      "title": "Биология",
-      "schedule": {
-        "startH": 11,
-        "startM": 0,
-        "endH": 11,
-        "endM": 45
+      {
+        "place": 4,
+        "title": "Биология",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 26522
+      }
+    ],
+    "WEDNESDAY": [
+      {
+        "place": 1,
+        "title": "Биология",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 26217
       },
-      "classID": 26520
-    },
-    {
-      "place": 4,
-      "title": "Биология",
-      "schedule": {
-        "startH": 12,
-        "startM": 0,
-        "endH": 12,
-        "endM": 45
+      {
+        "place": 2,
+        "title": "Биология",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 26218
       },
-      "classID": 26522
-    }
-  ],
-  "WEDNESDAY": [
-    {
-      "place": 1,
-      "title": "Биология",
-      "schedule": {
-        "startH": 9,
-        "startM": 0,
-        "endH": 9,
-        "endM": 45
+      {
+        "place": 3,
+        "title": "Биология",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 26211
       },
-      "classID": 26217
-    },
-    {
-      "place": 2,
-      "title": "Биология",
-      "schedule": {
-        "startH": 10,
-        "startM": 0,
-        "endH": 10,
-        "endM": 45
+      {
+        "place": 4,
+        "title": "Биология",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 26216
       },
-      "classID": 26218
-    },
-    {
-      "place": 3,
-      "title": "Биология",
-      "schedule": {
-        "startH": 11,
-        "startM": 0,
-        "endH": 11,
-        "endM": 45
+      {
+        "place": 6,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        },
+        "classID": 26519
       },
-      "classID": 26211
-    },
-    {
-      "place": 4,
-      "title": "Биология",
-      "schedule": {
-        "startH": 12,
-        "startM": 0,
-        "endH": 12,
-        "endM": 45
+      {
+        "place": 7,
+        "title": "Биология",
+        "schedule": {
+          "startH": 14,
+          "startM": 55,
+          "endH": 15,
+          "endM": 40
+        },
+        "classID": 24267
+      }
+    ],
+    "THURSDAY": [
+      {
+        "place": 2,
+        "title": "Биология",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 24267
       },
-      "classID": 26216
-    },
-    {
-      "place": 6,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 55,
-        "endH": 14,
-        "endM": 40
+      {
+        "place": 3,
+        "title": "Биология",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 24268
       },
-      "classID": 26519
-    },
-    {
-      "place": 7,
-      "title": "Биология",
-      "schedule": {
-        "startH": 14,
-        "startM": 55,
-        "endH": 15,
-        "endM": 40
+      {
+        "place": 4,
+        "title": "Биология",
+        "schedule": {
+          "startH": 12,
+          "startM": 0,
+          "endH": 12,
+          "endM": 45
+        },
+        "classID": 26212
       },
-      "classID": 24267
-    }
-  ],
-  "THURSDAY": [
-    {
-      "place": 2,
-      "title": "Биология",
-      "schedule": {
-        "startH": 10,
-        "startM": 0,
-        "endH": 10,
-        "endM": 45
+      {
+        "place": 5,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 26521
       },
-      "classID": 24267
-    },
-    {
-      "place": 3,
-      "title": "Биология",
-      "schedule": {
-        "startH": 11,
-        "startM": 0,
-        "endH": 11,
-        "endM": 45
+      {
+        "place": 6,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        },
+        "classID": 26215
+      }
+    ],
+    "FRIDAY": [
+      {
+        "place": 1,
+        "title": "Биология",
+        "schedule": {
+          "startH": 9,
+          "startM": 0,
+          "endH": 9,
+          "endM": 45
+        },
+        "classID": 26520
       },
-      "classID": 24268
-    },
-    {
-      "place": 4,
-      "title": "Биология",
-      "schedule": {
-        "startH": 12,
-        "startM": 0,
-        "endH": 12,
-        "endM": 45
+      {
+        "place": 2,
+        "title": "Биология",
+        "schedule": {
+          "startH": 10,
+          "startM": 0,
+          "endH": 10,
+          "endM": 45
+        },
+        "classID": 26521
       },
-      "classID": 26212
-    },
-    {
-      "place": 5,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 0,
-        "endH": 13,
-        "endM": 45
+      {
+        "place": 3,
+        "title": "Биология",
+        "schedule": {
+          "startH": 11,
+          "startM": 0,
+          "endH": 11,
+          "endM": 45
+        },
+        "classID": 26522
       },
-      "classID": 26521
-    },
-    {
-      "place": 6,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 55,
-        "endH": 14,
-        "endM": 40
+      {
+        "place": 5,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 26211
       },
-      "classID": 26215
-    }
-  ],
-  "FRIDAY": [
-    {
-      "place": 1,
-      "title": "Биология",
-      "schedule": {
-        "startH": 9,
-        "startM": 0,
-        "endH": 9,
-        "endM": 45
+      {
+        "place": 6,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        },
+        "classID": 26212
+      }
+    ],
+    "SATURDAY": [
+      {
+        "place": 5,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 0,
+          "endH": 13,
+          "endM": 45
+        },
+        "classID": 26217
       },
-      "classID": 26520
-    },
-    {
-      "place": 2,
-      "title": "Биология",
-      "schedule": {
-        "startH": 10,
-        "startM": 0,
-        "endH": 10,
-        "endM": 45
-      },
-      "classID": 26521
-    },
-    {
-      "place": 3,
-      "title": "Биология",
-      "schedule": {
-        "startH": 11,
-        "startM": 0,
-        "endH": 11,
-        "endM": 45
-      },
-      "classID": 26522
-    },
-    {
-      "place": 5,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 0,
-        "endH": 13,
-        "endM": 45
-      },
-      "classID": 26211
-    },
-    {
-      "place": 6,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 55,
-        "endH": 14,
-        "endM": 40
-      },
-      "classID": 26212
-    }
-  ],
-  "SATURDAY": [
-    {
-      "place": 5,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 0,
-        "endH": 13,
-        "endM": 45
-      },
-      "classID": 26217
-    },
-    {
-      "place": 6,
-      "title": "Биология",
-      "schedule": {
-        "startH": 13,
-        "startM": 55,
-        "endH": 14,
-        "endM": 40
-      },
-      "classID": 26216
-    }
-  ]
+      {
+        "place": 6,
+        "title": "Биология",
+        "schedule": {
+          "startH": 13,
+          "startM": 55,
+          "endH": 14,
+          "endM": 40
+        },
+        "classID": 26216
+      }
+    ]
+  },
+  "second": null
 }

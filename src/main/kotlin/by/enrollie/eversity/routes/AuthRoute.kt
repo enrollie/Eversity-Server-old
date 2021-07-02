@@ -7,8 +7,10 @@
 
 package by.enrollie.eversity.routes
 
+import by.enrollie.eversity.N_Placer
 import by.enrollie.eversity.controllers.AuthController
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.invalidateAllTokens
+import by.enrollie.eversity.database.functions.invalidateSingleToken
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import by.enrollie.eversity.exceptions.UserNotRegistered
 import by.enrollie.eversity.security.User
@@ -35,7 +37,7 @@ fun Route.authRoutes() {
                         HttpStatusCode.Forbidden,
                         "Authentication failed. Check your token."
                     )
-                    val removedTokenCount = EversityDatabase.invalidateAllTokens(user.id, "USER_REQUEST")
+                    val removedTokenCount = invalidateAllTokens(user.id, "USER_REQUEST")
                     return@post call.respond(
                         HttpStatusCode.OK,
                         Json.encodeToString(mapOf("removed_tokens" to removedTokenCount))
@@ -46,7 +48,7 @@ fun Route.authRoutes() {
                         HttpStatusCode.Forbidden,
                         "Authentication failed. Check your token."
                     )
-                   EversityDatabase.invalidateSingleToken(user.id, user.token, "USER_REQUEST")
+                    invalidateSingleToken(user.id, user.token, "USER_REQUEST")
                     return@post call.respond(
                         HttpStatusCode.OK
                     )
@@ -54,6 +56,8 @@ fun Route.authRoutes() {
             }
         }
         post("/login") {
+            if (N_Placer.getSchoolsByAvailability())
+                return@post call.respondText("Schools.by is not available", status = HttpStatusCode.PreconditionFailed)
             val loginJSON: JsonObject
             try {
                 val req = call.receive<String>()

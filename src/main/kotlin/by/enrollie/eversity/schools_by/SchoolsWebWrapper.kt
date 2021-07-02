@@ -24,7 +24,7 @@ import it.skrape.core.htmlDocument
 import it.skrape.exceptions.ElementNotFoundException
 import it.skrape.selects.forEachLink
 import it.skrape.selects.html5.*
-import org.jetbrains.exposed.sql.exposedLogger
+import org.slf4j.Logger
 
 
 /**
@@ -37,10 +37,14 @@ open class SchoolsWebWrapper {
     protected var subdomainURL: String = "https://demo.schools.by/"
     private var schoolsBYCookies: Pair<String, String> = Pair("", "")
 
+    protected val logger: Logger = org.slf4j.LoggerFactory.getLogger("Schools.by")
+
     protected var client = HttpClient {
         followRedirects = true
         expectSuccess = false
         defaultRequest {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
             userAgent(userAgent)
             timeout {
                 this.connectTimeoutMillis = 1000
@@ -87,7 +91,7 @@ open class SchoolsWebWrapper {
      * @param Cookies Cookies
      * @constructor Constructs wrapper with given cookies
      */
-    constructor(Cookies: Pair<String, String>){
+    constructor(Cookies: Pair<String, String>) {
         subdomainURL = configSubdomainURL ?: "https://demo.schools.by/"
         schoolsBYCookies = Cookies
     }
@@ -176,8 +180,9 @@ open class SchoolsWebWrapper {
                 cookie("sessionid", cookies?.second ?: schoolsBYCookies.second)
             }
         }
+
         try {
-            val html = response.receive<String>()
+            val html: String = response.receive()
             htmlDocument(html) {
                 form {
                     withAttribute = Pair("action", "https://schools.by/login")
@@ -187,8 +192,7 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: NoTransformationFoundException) {
-            //TODO: Add log
-            e.printStackTrace()
+            logger.error(e)
             return false //Did not recieve page correctly.
         } catch (e: ElementNotFoundException) {
             if (changeInternal && cookies != null) {
@@ -244,7 +248,7 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
-            exposedLogger.error(e)
+            logger.error(e)
             throw IllegalArgumentException()
         }
         return pupilsArray
@@ -283,6 +287,7 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
+            logger.debug(e.message)
             throw IllegalArgumentException()
         }
         return classTeacherID
@@ -339,7 +344,8 @@ open class SchoolsWebWrapper {
                                                             findAll {
                                                                 forEach { doc ->
                                                                     if (!titles.contains(doc.attribute("title"))
-                                                                        && doc.attribute("title").isNotEmpty())
+                                                                        && doc.attribute("title").isNotEmpty()
+                                                                    )
                                                                         titles.add(doc.attribute("title"))
                                                                 }
                                                             }
@@ -350,7 +356,8 @@ open class SchoolsWebWrapper {
                                                                 findAll {
                                                                     forEach { doc ->
                                                                         if (!titles.contains(doc.attribute("title"))
-                                                                            && doc.attribute("title").isNotEmpty())
+                                                                            && doc.attribute("title").isNotEmpty()
+                                                                        )
                                                                             titles.add(doc.attribute("title"))
                                                                     }
                                                                 }
@@ -376,7 +383,7 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
-            e.printStackTrace()
+            logger.error(e)
         }
         return timetableMap
     }
@@ -418,6 +425,7 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
+            logger.error(e)
             return null
         }
         return classID
@@ -429,58 +437,88 @@ open class SchoolsWebWrapper {
      * @return Map<DayOfWeek, TimetableDay>
      * @throws IllegalArgumentException Thrown, if
      */
-    suspend fun fetchTeacherTimetable(userID: Int): Map<DayOfWeek, Array<TeacherLesson>> {
+    suspend fun fetchTeacherTimetable(userID: Int): Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?> {
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}teacher/$userID/timetable")
             method = HttpMethod.Get
         }
         val pageString = response.receive<String>()
-        val timetableMap = mutableMapOf<DayOfWeek, Array<TeacherLesson>>()
+        val firstShiftMap = mutableMapOf<DayOfWeek, Array<TeacherLesson>>()
         for (i in 0..5) {
-            timetableMap[DayOfWeek.values()[i]] = arrayOf()
+            firstShiftMap[DayOfWeek.values()[i]] = arrayOf()
         }
+        val secondShiftMap = firstShiftMap.toMap().toMutableMap()
 
-        var table = arrayOf<Array<TeacherLesson?>>()
         try {
             htmlDocument(pageString) {
                 table {
-                    tbody {
-                        tr {
-                            findAll {
-                                forEachIndexed { lessonIndex, mainDoc ->
-                                    val timeConstraints =
-                                        mainDoc.td { withClass = "bells"; findFirst { ownText } }.toTimeConstraint()
-                                            ?: TimeConstraints(0, 0, 0, 0)
-                                    table += arrayOfNulls(6)
-                                    mainDoc.td {
-                                        findAll {
-                                            this.filter {
-                                                it.className != "bells" && it.className != "num"
-                                            }.forEachIndexed { dayIndex, docElement ->
-                                                if (docElement.ownText.isEmpty()) {
-                                                    docElement.div {
-                                                        withClass = "lesson"
-                                                        findFirst {
-                                                            val name = try {
-                                                                b { findFirst { ownText } }
-                                                            } catch (e: ElementNotFoundException) {
-                                                                a { withClass = "subject"; findFirst { ownText } }
-                                                            }
-                                                            val classID =
-                                                                span { a { findFirst { eachHref.firstOrNull() } } }?.removePrefix(
-                                                                    "/class/"
-                                                                )?.toInt() ?: 0
+                    findAll {
+                        forEachIndexed { _, docElement ->
+                            var table = arrayOf<Array<TeacherLesson?>>()
+                            var isFirstShift = true
+                            docElement.tbody {
+                                tr {
+                                    findAll {
+                                        forEachIndexed { lessonIndex, mainDoc ->
+                                            val timeConstraints =
+                                                mainDoc.td { withClass = "bells"; findFirst { ownText } }
+                                                    .toTimeConstraint()
+                                                    ?: TimeConstraints(0, 0, 0, 0)
+                                            if (lessonIndex == 1 && timeConstraints.startHour !in 8..11)
+                                                isFirstShift = false
+                                            table += arrayOfNulls(6)
+                                            mainDoc.td {
+                                                findAll {
+                                                    this.filter {
+                                                        it.className != "bells" && it.className != "num"
+                                                    }.forEachIndexed { dayIndex, docElement ->
+                                                        if (docElement.ownText.isEmpty()) {
+                                                            docElement.div {
+                                                                withClass = "lesson"
+                                                                findFirst {
+                                                                    val name = try {
+                                                                        b { findFirst { ownText } }
+                                                                    } catch (e: ElementNotFoundException) {
+                                                                        a {
+                                                                            withClass = "subject"; findFirst { ownText }
+                                                                        }
+                                                                    }
+                                                                    val classID =
+                                                                        span { a { findFirst { eachHref.firstOrNull() } } }?.removePrefix(
+                                                                            "/class/"
+                                                                        )?.toInt() ?: 0
 
-                                                            table[lessonIndex][dayIndex] = TeacherLesson(
-                                                                place = lessonIndex.toShort(),
-                                                                title = name,
-                                                                schedule = timeConstraints,
-                                                                classID = classID
-                                                            )
+                                                                    table[lessonIndex][dayIndex] = TeacherLesson(
+                                                                        place = lessonIndex.toShort(),
+                                                                        title = name,
+                                                                        schedule = timeConstraints,
+                                                                        classID = classID
+                                                                    )
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                            if (isFirstShift) {
+                                table.forEachIndexed { _, arr ->
+                                    arr.forEachIndexed { dayNum, it ->
+                                        if (it != null) {
+                                            firstShiftMap[DayOfWeek.values()[dayNum]] =
+                                                firstShiftMap[DayOfWeek.values()[dayNum]]?.plus(it) ?: arrayOf()
+                                        }
+                                    }
+                                }
+                            } else {
+                                table.forEachIndexed { _, arr ->
+                                    arr.forEachIndexed { dayNum, it ->
+                                        if (it != null) {
+                                            secondShiftMap[DayOfWeek.values()[dayNum]] =
+                                                secondShiftMap[DayOfWeek.values()[dayNum]]?.plus(it) ?: arrayOf()
                                         }
                                     }
                                 }
@@ -490,16 +528,11 @@ open class SchoolsWebWrapper {
                 }
             }
         } catch (e: ElementNotFoundException) {
-            return timetableMap
+            return Pair(null, null)
         }
-        table.forEachIndexed { _, arr ->
-            arr.forEachIndexed { dayNum, it ->
-                if (it != null) {
-                    timetableMap[DayOfWeek.values()[dayNum]] =
-                        timetableMap[DayOfWeek.values()[dayNum]]?.plus(it) ?: arrayOf()
-                }
-            }
-        }
-        return timetableMap
+        return Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?>(
+            first = if (firstShiftMap.filter { it.value.isNotEmpty() }.isNotEmpty()) firstShiftMap else null,
+            second = if (secondShiftMap.filter { it.value.isNotEmpty() }.isNotEmpty()) secondShiftMap else null
+        )
     }
 }

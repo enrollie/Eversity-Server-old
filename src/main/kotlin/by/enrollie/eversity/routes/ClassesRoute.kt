@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.*
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -27,9 +27,9 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(text = "Class with ID $classID was not found in this instance")
-                val classData = EversityDatabase.getClass(classID)
+                val classData = getClass(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -41,9 +41,9 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(text = "Class with ID $classID was not found in this instance")
-                val classTimetable = EversityDatabase.getClassTimetable(classID)
+                val classTimetable = getClassTimetable(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -55,9 +55,9 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(text = "Class with ID $classID was not found in this instance")
-                val classPupils = EversityDatabase.getClassPupils(classID)
+                val classPupils = getClassPupils(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -69,9 +69,9 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(text = "Class with ID $classID was not found in this instance")
-                val absences = EversityDatabase.getClassAbsence(classID)
+                val absences = getClassAbsence(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -83,7 +83,7 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(text = "Class with ID $classID was not found in this instance")
                 val date = call.parameters["date"] ?: return@get call.respondText(
                     "Missing date",
@@ -95,7 +95,7 @@ fun Route.classesRoute() {
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText("Malformed date", status = HttpStatusCode.BadRequest)
                 }
-                val absences = EversityDatabase.getClassAbsence(classID, date)
+                val absences = getClassAbsence(classID, date)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -107,7 +107,7 @@ fun Route.classesRoute() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesClassExist(classID))
+                if (!doesClassExist(classID))
                     return@get call.respondText(
                         text = "Class with ID $classID was not found in this instance",
                         status = HttpStatusCode.NotFound
@@ -128,7 +128,7 @@ fun Route.classesRoute() {
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText("Malformed date", status = HttpStatusCode.BadRequest)
                 }
-                val absences = EversityDatabase.getClassAbsence(classID, startDay, endDay)
+                val absences = getClassAbsence(classID, startDay, endDay)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,

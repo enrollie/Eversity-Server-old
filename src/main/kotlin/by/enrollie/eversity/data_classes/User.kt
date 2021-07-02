@@ -7,12 +7,12 @@
 
 package by.enrollie.eversity.data_classes
 
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.doesUserExist
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class User(val id: Int, val type: APIUserType) {
     fun isValid(): Boolean =
-        EversityDatabase.doesUserExist(id)
+        doesUserExist(id)
 
 }

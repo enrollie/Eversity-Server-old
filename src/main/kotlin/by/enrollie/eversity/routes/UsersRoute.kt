@@ -7,12 +7,13 @@
 
 package by.enrollie.eversity.routes
 
+import by.enrollie.eversity.N_Placer
 import by.enrollie.eversity.controllers.DataController
-import by.enrollie.eversity.data_classes.APIUserType
-import by.enrollie.eversity.data_classes.DayOfWeek
-import by.enrollie.eversity.data_classes.Lesson
 import by.enrollie.eversity.data_classes.User
-import by.enrollie.eversity.database.EversityDatabase
+import by.enrollie.eversity.database.functions.doesUserExist
+import by.enrollie.eversity.database.functions.getUserName
+import by.enrollie.eversity.database.functions.getUserType
+import by.enrollie.eversity.database.functions.invalidateAllTokens
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -30,67 +31,29 @@ fun Route.usersRouting() {
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (!EversityDatabase.doesUserExist(id)) {
+                if (!doesUserExist(id)) {
                     return@get call.respondText("User with ID $id was not found.", status = HttpStatusCode.NotFound)
                 }
-                val userType = EversityDatabase.getUserType(id)
-                val name = EversityDatabase.getUserName(userID = id, userType)
-                when (userType) {
-                    APIUserType.Pupil -> {
-                        val timetable = EversityDatabase.getPupilTimetable(id)
-                        return@get call.respondText(
-                            contentType = ContentType.Application.Json, text = Json.encodeToString(
-                                mapOf(
-                                    "id" to Json.encodeToJsonElement(id.toString()),
-                                    "type" to Json.encodeToJsonElement(userType.name),
-                                    "firstName" to Json.encodeToJsonElement(name.first),
-                                    "middleName" to Json.encodeToJsonElement(name.second),
-                                    "lastName" to Json.encodeToJsonElement(name.third),
-                                    "timetable" to Json.encodeToJsonElement(timetable)
-                                )
-                            )
+                val userType = getUserType(id)
+                val name = getUserName(userID = id, userType)
+                return@get call.respondText(
+                    contentType = ContentType.Application.Json, text = Json.encodeToString(
+                        mapOf(
+                            "id" to Json.encodeToJsonElement(id.toString()),
+                            "type" to Json.encodeToJsonElement(userType.name),
+                            "firstName" to Json.encodeToJsonElement(name.first),
+                            "middleName" to Json.encodeToJsonElement(name.second),
+                            "lastName" to Json.encodeToJsonElement(name.third)
                         )
-                    }
-                    APIUserType.Teacher -> {
-                        val timetable = EversityDatabase.getTeacherTimetable(id)
-                        return@get call.respondText(
-                            contentType = ContentType.Application.Json, text = Json.encodeToString(
-                                mapOf(
-                                    "id" to Json.encodeToJsonElement(id.toString()),
-                                    "type" to Json.encodeToJsonElement(userType.name),
-                                    "firstName" to Json.encodeToJsonElement(name.first),
-                                    "middleName" to Json.encodeToJsonElement(name.second),
-                                    "lastName" to Json.encodeToJsonElement(name.third),
-                                    "timetable" to Json.encodeToJsonElement(timetable)
-                                )
-                            )
-                        )
-                    }
-                    else -> {
-                        val timetable = mutableMapOf<DayOfWeek, Array<Lesson>>(
-                            DayOfWeek.MONDAY to arrayOf(),
-                            DayOfWeek.TUESDAY to arrayOf(),
-                            DayOfWeek.WEDNESDAY to arrayOf(),
-                            DayOfWeek.THURSDAY to arrayOf(),
-                            DayOfWeek.FRIDAY to arrayOf(),
-                            DayOfWeek.SATURDAY to arrayOf(),
-                        )
-                        return@get call.respondText(
-                            contentType = ContentType.Application.Json, text = Json.encodeToString(
-                                mapOf(
-                                    "id" to Json.encodeToJsonElement(id.toString()),
-                                    "type" to Json.encodeToJsonElement(userType.name),
-                                    "firstName" to Json.encodeToJsonElement(name.first),
-                                    "middleName" to Json.encodeToJsonElement(name.second),
-                                    "lastName" to Json.encodeToJsonElement(name.third),
-                                    "timetable" to Json.encodeToJsonElement(timetable)
-                                )
-                            )
-                        )
-                    }
-                }
+                    )
+                )
             }
             post("/{id}") {
+                if (N_Placer.getSchoolsByAvailability())
+                    return@post call.respondText(
+                        "Schools.by is not available",
+                        status = HttpStatusCode.PreconditionFailed
+                    )
                 val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respondText(
                     "Missing or malformed ID",
                     status = HttpStatusCode.BadRequest
@@ -100,16 +63,16 @@ fun Route.usersRouting() {
                         HttpStatusCode.Forbidden,
                         "Authentication failed. Check your token."
                     )
-                if (!EversityDatabase.doesUserExist(id)) {
+                if (!doesUserExist(id)) {
                     return@post call.respondText("User with ID $id was not found.", status = HttpStatusCode.NotFound)
                 }
-                val requestedUser = User(id, EversityDatabase.getUserType(id))
+                val requestedUser = User(id, getUserType(id))
                 try {
                     DataController().updateUser(requestedUser)
                     return@post call.respond(HttpStatusCode.OK)
                 } catch (e: IllegalStateException) {
                     if (userJWT.id == requestedUser.id) {
-                        EversityDatabase.invalidateAllTokens(requestedUser.id, "INVALID_CREDENTIALS_ON_UPDATE")
+                        invalidateAllTokens(requestedUser.id, "INVALID_CREDENTIALS_ON_UPDATE")
                         return@post call.respond(
                             HttpStatusCode.PreconditionFailed,
                             Json.encodeToJsonElement(

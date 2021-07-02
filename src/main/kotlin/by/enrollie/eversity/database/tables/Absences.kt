@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.jodatime.date
 
 object Absences:Table() {
-    val pupilID = (integer("pupilid") references Pupils.id)
+    val pupilID = (integer("pupilid") references Pupils.id).nullable()
     val classID = (integer("classid") references Classes.classID)
     val date = date("date")
     val reason = varchar("reason", 12)
