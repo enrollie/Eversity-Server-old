@@ -15,6 +15,7 @@ object Marks: Table() {
     val pupilID = (integer("pupilid") references Pupils.id)
     val classID = (integer("classid") references Classes.classID)
     val date = varchar("date", 10)
+    val place = short("lessonplace")
     val journalID = integer("journalid")
     val lessonID = integer("lessonid")
 }

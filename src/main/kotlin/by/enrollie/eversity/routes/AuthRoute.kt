@@ -34,7 +34,7 @@ fun Route.authRoutes() {
             route("/invalidate") {
                 post("/all") {
                     val user = call.authentication.principal<User>() ?: return@post call.respond(
-                        HttpStatusCode.Forbidden,
+                        HttpStatusCode.Unauthorized,
                         "Authentication failed. Check your token."
                     )
                     val removedTokenCount = invalidateAllTokens(user.id, "USER_REQUEST")
@@ -45,7 +45,7 @@ fun Route.authRoutes() {
                 }
                 post("/current") {
                     val user = call.authentication.principal<User>() ?: return@post call.respond(
-                        HttpStatusCode.Forbidden,
+                        HttpStatusCode.Unauthorized,
                         "Authentication failed. Check your token."
                     )
                     invalidateSingleToken(user.id, user.token, "USER_REQUEST")
@@ -54,9 +54,16 @@ fun Route.authRoutes() {
                     )
                 }
             }
+            get("/check"){
+                val user = call.authentication.principal<User>() ?: return@get call.respond(
+                    HttpStatusCode.Unauthorized,
+                    "Authentication failed. Check your token."
+                )
+                call.respond(HttpStatusCode.OK)
+            }
         }
         post("/login") {
-            if (N_Placer.getSchoolsByAvailability())
+            if (!N_Placer.getSchoolsByAvailability())
                 return@post call.respondText("Schools.by is not available", status = HttpStatusCode.PreconditionFailed)
             val loginJSON: JsonObject
             try {

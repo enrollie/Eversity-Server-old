@@ -40,7 +40,7 @@ fun Route.telegramRoute() {
                 }
                 val userJWT =
                     call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@get call.respond(
-                        HttpStatusCode.Forbidden,
+                        HttpStatusCode.Unauthorized,
                         "Authentication failed. Check your token."
                     )
                 if (telegramPairingCodesList.find { it.second.first == userJWT.id } != null) {
@@ -125,7 +125,7 @@ fun Route.telegramRoute() {
             post("/unpair") {
                 val userJWT =
                     call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@post call.respond(
-                        HttpStatusCode.Forbidden,
+                        HttpStatusCode.Unauthorized,
                         "Authentication failed. Check your token."
                     )
                 removeTelegramNotifyData(userJWT.id)

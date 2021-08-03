@@ -36,7 +36,8 @@ class AuthController {
 
     /**
      * Registers user and all it's data in database
-     *
+     * @throws AuthorizationUnsuccessful Thrown, if Schools.by rejected credentials
+     * @return Eversity access token
      */
     suspend fun registerUser(username: String, password: String): String {
         val schoolsAPI = SchoolsAPIClient()

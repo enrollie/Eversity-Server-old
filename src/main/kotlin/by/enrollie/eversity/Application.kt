@@ -20,6 +20,7 @@ import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.routes.*
+import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
 import io.ktor.application.*
 import io.ktor.client.*
@@ -41,7 +42,6 @@ import org.joda.time.DateTime
 import org.joda.time.Minutes
 import java.io.File
 import java.net.UnknownHostException
-import java.net.http.HttpConnectTimeoutException
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -50,7 +50,8 @@ private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 lateinit var EversityBot: EversityNotifier
-lateinit var N_Placer: EversityPlacer
+lateinit var N_Placer: EversityPlacer //name is taken from my previous project
+lateinit var SchoolsCredentialsChecker: CredentialsChecker
 lateinit var SCHOOL_NAME: SchoolNameDeclensions
 lateinit var SCHOOL_WEBSITE: String
 
@@ -128,9 +129,15 @@ fun Application.module(testing: Boolean = false) {
     configSubdomainURL = environment.config.config("schools").property("subdomain").getString()
 
     val telegramToken = environment.config.config("telegram").property("botToken").getString()
+
     SCHOOL_WEBSITE = environment.config.config("school").property("website").getString()
     EversityBot = EversityNotifier(telegramToken)
     N_Placer = EversityPlacer(org.slf4j.LoggerFactory.getLogger("Eversity"))
+    SchoolsCredentialsChecker =
+        CredentialsChecker(
+            environment.config.config("eversity").property("autoCredentialsRecheck").getString().toInt(),
+            org.slf4j.LoggerFactory.getLogger("Schools.by")
+        )
 
     configureAuthentication()
     configureHTTP()
@@ -139,8 +146,9 @@ fun Application.module(testing: Boolean = false) {
     registerTelegramRoute()
     registerAuthRoute()
     registerUsersRoute()
+    registerDiary()
     registerAbsenceRoute()
-
+    registerTeachers()
     //TODO: Remove, when web client is done
     routing {
         get("/") {
@@ -191,9 +199,7 @@ private suspend fun checkSchoolsByAvailability(): Boolean {
         return response.status == HttpStatusCode.OK
     } catch (e: HttpRequestTimeoutException) {
         false
-    } catch (e: HttpConnectTimeoutException) {
-        false
-    }catch (e: UnknownHostException){
+    } catch (e: UnknownHostException) {
         false
     }
 }

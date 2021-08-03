@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 /**
@@ -38,7 +39,7 @@ fun doesUserExist(userID: Int): Boolean {
         Users.select { Users.id eq userID }.toList()
     }
     if (tos.isNotEmpty())
-        CoroutineScope(Dispatchers.Default).launch{ cacheUser(User(userID, getUserType(userID))) }
+        CoroutineScope(Dispatchers.Default).launch { cacheUser(User(userID, getUserType(userID))) }
     return tos.isNotEmpty()
 }
 
@@ -206,6 +207,17 @@ fun getUserName(userID: Int, type: APIUserType): Triple<String, String?, String>
         }
         else -> {
             Triple("", "", "")
+        }
+    }
+}
+
+fun getAllCredentials(): List<Pair<Int, Triple<String?, String?, String>>> {
+    return transaction {
+        Credentials.selectAll().toList().map {
+            Pair(
+                it[Credentials.id],
+                Triple(it[Credentials.csrfToken], it[Credentials.sessionID], it[Credentials.token])
+            )
         }
     }
 }

@@ -80,7 +80,9 @@ class SchoolsAPIClient() {
      * @return Schools.by token, else null if password is wrong
      */
     suspend fun getAPIToken(username: String, password: String): String? {
-        val tempClient = HttpClient()
+        val tempClient = HttpClient {
+            expectSuccess = false
+        }
         val credentialsJSON = JsonObject(
             mapOf(
                 "username" to Json.parseToJsonElement("\"$username\""),
@@ -95,6 +97,8 @@ class SchoolsAPIClient() {
                 this.body = credentialsJSON.toString()
             }
         }
+        if (resp.status != HttpStatusCode.OK)
+            return null
         val response = Json.parseToJsonElement(String(resp.readBytes())).jsonObject
         return if (response.containsKey("token")) {
             token = response.getValue("token").jsonPrimitive.content

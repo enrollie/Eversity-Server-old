@@ -26,6 +26,30 @@ import kotlinx.serialization.json.encodeToJsonElement
 fun Route.usersRouting() {
     route("/api/user") {
         authenticate("jwt") {
+            get { //TODO: Write OpenAPI docs
+                val userJWT =
+                    call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        "Authentication failed. Check your token."
+                    )
+                if (!doesUserExist(userJWT.id))
+                    return@get call.respondText(
+                        "User with ID ${userJWT.id} was not found.",
+                        status = HttpStatusCode.NotFound
+                    )
+                val name = getUserName(userJWT.id, userJWT.type)
+                return@get call.respondText(
+                    contentType = ContentType.Application.Json, text = Json.encodeToString(
+                        mapOf(
+                            "id" to Json.encodeToJsonElement(userJWT.id.toString()),
+                            "type" to Json.encodeToJsonElement(userJWT.type.name),
+                            "firstName" to Json.encodeToJsonElement(name.first),
+                            "middleName" to Json.encodeToJsonElement(name.second),
+                            "lastName" to Json.encodeToJsonElement(name.third)
+                        )
+                    )
+                )
+            }
             get("/{id}") {
                 val id = call.parameters["id"]?.toIntOrNull() ?: return@get call.respondText(
                     "Missing or malformed ID",
@@ -60,7 +84,7 @@ fun Route.usersRouting() {
                 )
                 val userJWT =
                     call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@post call.respond(
-                        HttpStatusCode.Forbidden,
+                        HttpStatusCode.Unauthorized,
                         "Authentication failed. Check your token."
                     )
                 if (!doesUserExist(id)) {

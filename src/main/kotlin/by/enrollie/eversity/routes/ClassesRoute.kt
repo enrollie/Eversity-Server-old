@@ -28,7 +28,10 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.BadRequest
                 )
                 if (!doesClassExist(classID))
-                    return@get call.respondText(text = "Class with ID $classID was not found in this instance")
+                    return@get call.respondText(
+                        text = "Class with ID $classID was not found in this instance",
+                        status = HttpStatusCode.NotFound
+                    )
                 val classData = getClass(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
@@ -42,7 +45,10 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.BadRequest
                 )
                 if (!doesClassExist(classID))
-                    return@get call.respondText(text = "Class with ID $classID was not found in this instance")
+                    return@get call.respondText(
+                        text = "Class with ID $classID was not found in this instance",
+                        status = HttpStatusCode.NotFound
+                    )
                 val classTimetable = getClassTimetable(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
@@ -56,7 +62,10 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.BadRequest
                 )
                 if (!doesClassExist(classID))
-                    return@get call.respondText(text = "Class with ID $classID was not found in this instance")
+                    return@get call.respondText(
+                        text = "Class with ID $classID was not found in this instance",
+                        status = HttpStatusCode.NotFound
+                    )
                 val classPupils = getClassPupils(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
@@ -70,7 +79,10 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.BadRequest
                 )
                 if (!doesClassExist(classID))
-                    return@get call.respondText(text = "Class with ID $classID was not found in this instance")
+                    return@get call.respondText(
+                        text = "Class with ID $classID was not found in this instance",
+                        status = HttpStatusCode.NotFound
+                    )
                 val absences = getClassAbsence(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
@@ -84,7 +96,10 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.BadRequest
                 )
                 if (!doesClassExist(classID))
-                    return@get call.respondText(text = "Class with ID $classID was not found in this instance")
+                    return@get call.respondText(
+                        text = "Class with ID $classID was not found in this instance",
+                        status = HttpStatusCode.NotFound
+                    )
                 val date = call.parameters["date"] ?: return@get call.respondText(
                     "Missing date",
                     status = HttpStatusCode.BadRequest

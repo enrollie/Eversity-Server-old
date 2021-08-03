@@ -11,15 +11,14 @@ plugins {
     application
     kotlin("jvm") version "1.5.0"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
-    id("com.github.johnrengelman.shadow") version "6.1.0"
+    id("com.github.johnrengelman.shadow") version "7.0.0"
     id("org.jetbrains.dokka") version "1.4.32"
 }
 
 group = "by.enrollie.eversity"
 version = getGitVersion()
 application {
-    mainClassName = "by.enrollie.eversity.ApplicationKt"
-    mainClass.set("by.enrollie.eversity.ApplicationKt")
+    mainClass.set("io.ktor.server.netty.EngineMain")
 }
 
 fun getGitVersion(): String {
@@ -44,6 +43,7 @@ repositories {
 dependencies {
     //----KTOR DEPENDENCIES
     implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-auth:$ktorVersion")
     implementation("io.ktor:ktor-auth-jwt:$ktorVersion")
     implementation("io.ktor:ktor-server-sessions:$ktorVersion")
@@ -117,24 +117,9 @@ compileTestKotlin.kotlinOptions {
 }
 
 tasks.create("stage") {
-    dependsOn("uberJar")
+    dependsOn("shadowJar")
 }
 
-tasks.register<Jar>("uberJar") {
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
     archiveClassifier.set("uber")
-
-    manifest {
-        attributes(
-            "Main-Class" to "by.enrollie.eversity.ApplicationKt",
-            "Implementation-Title" to "Gradle",
-            "Implementation-Version" to archiveVersion
-        )
-    }
-
-    from(sourceSets.main.get().output)
-
-    dependsOn(configurations.runtimeClasspath)
-    from({
-        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
-    })
 }

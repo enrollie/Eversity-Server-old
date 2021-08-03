@@ -68,6 +68,7 @@ class SchoolsPlacer : SchoolsWebWrapper {
         pupil: Pupil,
         lessonID: Int,
         journalID: Int,
+        lessonPlace: Short,
         date: String = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time),
         mark: Short? = -1,
         markID: Int? = null
@@ -88,7 +89,7 @@ class SchoolsPlacer : SchoolsWebWrapper {
             HttpStatusCode.OK, HttpStatusCode.Found -> {
                 val responseMarkID =
                     Json.parseToJsonElement(responseBody).jsonObject["id"]?.jsonPrimitive?.content?.toInt() ?: 0
-                return Mark(responseMarkID, mark, pupil)
+                return Mark(responseMarkID, mark, lessonPlace, pupil)
             }
             HttpStatusCode.BadRequest -> {
                 throw MarkAlreadyExistsException("Mark already exists. Journal ID: $journalID; Lesson ID: $lessonID;")
@@ -136,15 +137,16 @@ class SchoolsPlacer : SchoolsWebWrapper {
                     null
                 }
                 val existingMark = if (existingMarkData != null) {
-                    val markID = existingMarkData["id"]?.jsonPrimitive?.intOrNull ?: throw UnknownError("Mark ID is null")
-                    val markValueStr = existingMarkData["m"]?.jsonPrimitive?.content ?: throw UnknownError("Mark value is null")
+                    val markID =
+                        existingMarkData["id"]?.jsonPrimitive?.intOrNull ?: throw UnknownError("Mark ID is null")
+                    val markValueStr =
+                        existingMarkData["m"]?.jsonPrimitive?.content ?: throw UnknownError("Mark value is null")
                     val markValue: Short? = when (markValueStr) {
-                        "", "з.", "н/з"," " -> null
+                        "", "з.", "н/з", " " -> null
                         "н" -> -1
                         else -> markValueStr.toShortOrNull()
                     }
-                    marksList.add(Pair(Mark(markID, markValue, pupil), Pair(journalID, lessonID)))
-                    Mark(markID, markValue, pupil)
+                    Mark(markID, markValue, absence.first, pupil)
                 } else null
                 try {
                     val placedMark = if (existingMark != null) {
@@ -153,12 +155,20 @@ class SchoolsPlacer : SchoolsWebWrapper {
                                 pupil,
                                 lessonID,
                                 journalID,
+                                lessonPlace = absence.first,
                                 mark = if (absence.second) -1 else null,
                                 date = date,
                                 markID = existingMark.id
                             )
                         } else existingMark
-                    } else placeMark(pupil, lessonID, journalID, mark = if (absence.second) -1 else null, date = date)
+                    } else placeMark(
+                        pupil,
+                        lessonID,
+                        journalID,
+                        lessonPlace = absence.first,
+                        mark = if (absence.second) -1 else null,
+                        date = date
+                    )
                     marksList.add(Pair(placedMark, Pair(journalID, lessonID)))
                 } catch (e: MarkAlreadyExistsException) {
                     logger.error(e)

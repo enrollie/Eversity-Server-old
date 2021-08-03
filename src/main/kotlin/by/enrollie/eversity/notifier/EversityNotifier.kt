@@ -56,7 +56,7 @@ class EversityNotifier(telegramToken: String) {
                     update.consume()
                     bot.sendMessage(
                         ChatId.fromId(message.chat.id),
-                        text = properties.getProperty("hello").format(SCHOOL_NAME.nominative, "https://neitex.me")
+                        text = properties.getProperty("hello").format(SCHOOL_NAME.location, "WEBSITE PLACEHOLDER") //TODO: Ask for website
                     )
                 }
                 command("help") {

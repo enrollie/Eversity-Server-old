@@ -90,7 +90,7 @@ fun invalidateAllTokens(userID: Int, reason: String?): Int {
             BannedTokens.insert {
                 it[BannedTokens.userID] = userID
                 it[BannedTokens.token] = res[Tokens.token]
-                it[BannedTokens.banDate] = DateTime.now()
+                it[banDate] = DateTime.now()
                 it[BannedTokens.reason] = reason ?: "Unknown"
             }
         }
@@ -153,7 +153,7 @@ fun invalidateSingleToken(userID: Int, token: String, reason: String?): Boolean 
             it[BannedTokens.userID] = userID
             it[BannedTokens.token] = token
             it[BannedTokens.reason] = reason ?: "Unknown"
-            it[BannedTokens.banDate] = DateTime.now()
+            it[banDate] = DateTime.now()
         }
     }
     return true

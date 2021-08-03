@@ -28,6 +28,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import org.joda.time.DateTime
+import org.joda.time.IllegalFieldValueException
 import org.joda.time.format.DateTimeFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -42,7 +43,7 @@ fun Route.absenceRoute() {
         route("/api/absence") {
             get("/statistics") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 if (user.type != APIUserType.Social)
@@ -67,7 +68,7 @@ fun Route.absenceRoute() {
             }
             get("/statistics/day/{date}") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 if (user.type != APIUserType.Social)
@@ -100,7 +101,7 @@ fun Route.absenceRoute() {
             }
             post("/class/{id}") {
                 val user = call.authentication.principal<User>() ?: return@post call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 val classID = call.parameters["id"]?.toIntOrNull() ?: return@post call.respondText(
@@ -179,6 +180,38 @@ fun Route.absenceRoute() {
                         text = Json.encodeToString(
                             mapOf(
                                 "errorCode" to "NOT_ALL_USER_ID_MATCH_PUPIL_TYPE",
+                                "action" to "REVIEW_REQUEST"
+                            )
+                        ), status = HttpStatusCode.BadRequest
+                    )
+                }
+                try {
+                    absenceJob.forEach {
+                        if (DateTime.parse(it.date).dayOfWeek == 7){
+                            return@post call.respondText(
+                                text = Json.encodeToString(
+                                    mapOf(
+                                        "errorCode" to "ABSENCE_POST_SUNDAY",
+                                        "action" to "REVIEW_REQUEST"
+                                    )
+                                ), status = HttpStatusCode.BadRequest
+                            )
+                        }
+                    }
+                } catch (e: IllegalFieldValueException) {
+                    return@post call.respondText(
+                        text = Json.encodeToString(
+                            mapOf(
+                                "errorCode" to "MALFORMED_DATE",
+                                "action" to "REVIEW_REQUEST"
+                            )
+                        ), status = HttpStatusCode.BadRequest
+                    )
+                } catch (e: IllegalArgumentException) {
+                    return@post call.respondText(
+                        text = Json.encodeToString(
+                            mapOf(
+                                "errorCode" to "MALFORMED_DATE",
                                 "action" to "REVIEW_REQUEST"
                             )
                         ), status = HttpStatusCode.BadRequest
@@ -283,7 +316,7 @@ fun Route.absenceRoute() {
             }
             get("/statistics/ready") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 if (user.type != APIUserType.Social) {
@@ -312,7 +345,7 @@ fun Route.absenceRoute() {
             }
             get("/statistics/fill") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 if (user.type != APIUserType.Social) {
@@ -345,7 +378,7 @@ fun Route.absenceRoute() {
             }
             get("/statistics/fill/{date}") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Forbidden,
+                    HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
                 val date = try {
