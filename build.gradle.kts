@@ -9,6 +9,7 @@ val exposedVersion: String by project
 
 plugins {
     application
+    `maven-publish`
     kotlin("jvm") version "1.5.0"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
     id("com.github.johnrengelman.shadow") version "7.0.0"
@@ -122,4 +123,22 @@ tasks.create("stage") {
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
     archiveClassifier.set("uber")
+}
+publishing{
+    repositories {
+        maven{
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/enrollie/eversity-server")
+            credentials {
+                username = project.findProperty("gpr.user")?.toString() ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.key")?.toString() ?: System.getenv("TOKEN")
+            }
+        }
+    }
+    publications {
+        register<MavenPublication>("gpr") {
+            from(components["java"])
+            artifact("shadowJar")
+        }
+    }
 }
