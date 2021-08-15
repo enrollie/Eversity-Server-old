@@ -27,6 +27,11 @@ import javax.naming.AuthenticationException
  * @author Pavel Matusevich (Neitex)
  * @constructor Constructs wrapper class without initializing token.
  */
+@Deprecated(
+    "Schools.by killed their API on (approximately) 12 August 2021. In every possible way try to use SchoolsWebWrapper instead of it.",
+    ReplaceWith("SchoolsWebWrapper"),
+    DeprecationLevel.ERROR
+)
 @Suppress("unused")
 class SchoolsAPIClient() {
     private var token: String = "null"

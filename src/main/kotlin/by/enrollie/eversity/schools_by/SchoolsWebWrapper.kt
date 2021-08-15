@@ -11,6 +11,7 @@ import by.enrollie.eversity.configSubdomainURL
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.data_functions.russianDayNameToDayOfWeek
 import by.enrollie.eversity.data_functions.toTimeConstraint
+import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.features.*
@@ -22,7 +23,6 @@ import io.ktor.http.*
 import io.ktor.util.*
 import it.skrape.core.htmlDocument
 import it.skrape.exceptions.ElementNotFoundException
-import it.skrape.selects.forEachLink
 import it.skrape.selects.html5.*
 import org.slf4j.Logger
 
@@ -36,6 +36,18 @@ open class SchoolsWebWrapper {
 
     protected var subdomainURL: String = "https://demo.schools.by/"
     private var schoolsBYCookies: Pair<String, String> = Pair("", "")
+
+    /**
+     * Returns authenticated user type (else null)
+     */
+    var userType: APIUserType? = null
+        private set
+
+    /**
+     * Returns authenticated user ID (else null)
+     */
+    var authenticatedUserID: Int? = null
+        private set
 
     protected val logger: Logger = org.slf4j.LoggerFactory.getLogger("Schools.by")
 
@@ -145,6 +157,8 @@ open class SchoolsWebWrapper {
                     header(HttpHeaders.UserAgent, userAgent)
                 }
             }
+        if ((finalCSRFresponse.headers["location"] ?: "https://schools.by/login").contains("login"))
+            throw AuthorizationUnsuccessful()
         csrfTokenCookie = finalCSRFresponse.setCookie().find { it.name == "csrftoken" } ?: throw NoSuchElementException(
             "CSRFToken not found after finalCSRFresponse"
         )
@@ -159,6 +173,14 @@ open class SchoolsWebWrapper {
                 cookie("sessionid", schoolsBYCookies.second)
             }
         }
+        userType = when {
+            finalCSRFresponse.headers["location"]?.contains("pupil") == true -> APIUserType.Pupil
+            finalCSRFresponse.headers["location"]?.contains("teacher") == true -> APIUserType.Teacher
+            finalCSRFresponse.headers["location"]?.contains("parent") == true -> APIUserType.Parent
+            else -> null
+        }
+        authenticatedUserID =
+            finalCSRFresponse.headers["location"]?.let{ println(it.removeRange(0, it.lastIndexOf('/'))); it.removeRange(0, it.lastIndexOf('/')+1)}?.toIntOrNull()
         return schoolsBYCookies
     }
 
@@ -193,7 +215,7 @@ open class SchoolsWebWrapper {
             }
         } catch (e: NoTransformationFoundException) {
             logger.error(e)
-            return false //Did not recieve page correctly.
+            return false //Did not receive page correctly.
         } catch (e: ElementNotFoundException) {
             if (changeInternal && cookies != null) {
                 schoolsBYCookies = cookies
@@ -390,9 +412,9 @@ open class SchoolsWebWrapper {
 
     /**
      * Gets class string for current teacher.
-     * @return String, containing URL to class
+     * @return Class ID, if present, else null
      */
-    suspend fun fetchClassForCurrentUser(): Int? {
+    suspend fun fetchClassForCurrentUser(): Pair<Int, String>? {
         val response = HttpClient {
             followRedirects = true
         }.use {
@@ -406,6 +428,7 @@ open class SchoolsWebWrapper {
 
         val pageString = response.receive<String>()
         var classID: Int? = null
+        var className = ""
         try {
             htmlDocument(pageString) {
                 div {
@@ -414,9 +437,10 @@ open class SchoolsWebWrapper {
                         a {
                             withAttributeKey = "href"
                             findAll {
-                                forEachLink { _, url ->
-                                    if (url.contains(".schools.by/class/")) {
-                                        classID = url.replaceBeforeLast('/', "").drop(1).toInt()
+                                for (a in this) {
+                                    if (a.attribute("href").contains(".schools.by/class/") && classID == null) {
+                                        classID = a.attribute("href").replaceBeforeLast('/', "").drop(1).toInt()
+                                        className = a.ownText
                                     }
                                 }
                             }
@@ -428,7 +452,9 @@ open class SchoolsWebWrapper {
             logger.error(e)
             return null
         }
-        return classID
+        return if (classID != null) {
+            Pair(classID!!, className.replace("-го", ""))
+        } else null
     }
 
     /**
@@ -534,5 +560,149 @@ open class SchoolsWebWrapper {
             first = if (firstShiftMap.filter { it.value.isNotEmpty() }.isNotEmpty()) firstShiftMap else null,
             second = if (secondShiftMap.filter { it.value.isNotEmpty() }.isNotEmpty()) secondShiftMap else null
         )
+    }
+
+    suspend fun fetchParentPupils(parentID: Int): List<Pupil> {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("${subdomainURL}parent/$parentID")
+            method = HttpMethod.Get
+        }
+        when (response.status) {
+            HttpStatusCode.OK -> {
+            }
+            HttpStatusCode.NotFound -> throw IllegalArgumentException("Schools.by returned 404 for \"${subdomainURL}parent/$parentID\"")
+            HttpStatusCode.Found -> throw IllegalStateException("User does not have rights to access this user")
+        }
+        val pupilsList = mutableListOf<Pupil>()
+        try {
+            htmlDocument(response.receive<String>()) {
+                div {
+                    withClass = "cnt"
+                    findAll {
+                        for (list in this) {
+                            if (try {
+                                    list.table { }
+                                    false
+                                } catch (e: ElementNotFoundException) {
+                                    true
+                                }
+                            ) continue
+                            list.table {
+                                this.tr {
+                                    findAll {
+                                        for (line in this) {
+                                            val (name, ID) = line.td {
+                                                findFirst {
+                                                    a {
+                                                        findFirst {
+                                                            Pair(
+                                                                ownText,
+                                                                this.attribute("href").split("/").last().toIntOrNull()
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            val classID = line.td {
+                                                findSecond {
+                                                    a {
+                                                        findFirst {
+                                                            attribute("href").apply {
+                                                                removeRange(0, lastIndexOf('/'))
+                                                            }.toIntOrNull()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            pupilsList.add(
+                                                Pupil(
+                                                    ID ?: 0,
+                                                    name.split(" ")[1],
+                                                    name.split(" ")[0],
+                                                    classID ?: 0
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+
+        }
+        return pupilsList
+    }
+
+    suspend fun getPupilClass(pupilID: Int): Pair<Int, String> {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("${subdomainURL}pupil/$pupilID")
+            method = HttpMethod.Get
+        }
+        when (response.status) {
+            HttpStatusCode.OK -> {
+            }
+            HttpStatusCode.NotFound -> throw IllegalArgumentException("Schools.by returned 404 for \"${subdomainURL}pupil/$pupilID\"")
+            HttpStatusCode.Found -> throw IllegalStateException("User does not have rights to access this user")
+        }
+        var classID: Int? = null
+        var className = ""
+        try {
+            htmlDocument(response.receive<String>()) {
+                div {
+                    withClass = "pp_line"
+                    findFirst {
+                        a {
+                            findFirst {
+                                classID = attribute("href").removePrefix("/class/").toIntOrNull()
+                                className = ownText.replace("-го", "")
+                                if (classID == null)
+                                    throw UnknownError("Attributes: $attributes")
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+
+        }
+        if (classID == null)
+            throw UnknownError("Response headers: ${response.headers.toString()}")
+        return Pair(classID!!, className)
+    }
+
+    suspend fun getUserName(userID: Int): Pair<String, String> {
+        val response = client.request<HttpResponse> {
+            url.takeFrom("${subdomainURL}user/$userID")
+            method = HttpMethod.Get
+        }
+        when (response.status) {
+            HttpStatusCode.OK -> {
+            }
+            HttpStatusCode.NotFound -> throw IllegalArgumentException("Schools.by returned 404 for \"${subdomainURL}user/$userID\"")
+            HttpStatusCode.Found -> throw IllegalStateException("User does not have rights to access this user")
+        }
+        var name = ""
+        try {
+            htmlDocument(response.receive<String>()) {
+                h1 {
+                    findFirst {
+                        name = ownText
+                    }
+                }
+            }
+        } catch (e: ElementNotFoundException) {
+            name = "ERROR ERROR"
+        }
+        val returnData = if (name.split(" ").size > 2) {
+            val split = name.split(" ")
+            Pair(split[1], split.first() + " " + split[2])
+        } else {
+            val split = name.split(" ")
+            Pair(split[1], split.first())
+        }
+        return returnData
     }
 }

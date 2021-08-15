@@ -55,7 +55,6 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
                     continue
                 }
                 val result = try {
-                    SchoolsAPIClient(checkingCredentials.second.third).getCurrentUserData()
                     SchoolsWebWrapper().validateCookies(
                         Pair(
                             checkingCredentials.second.first!!,

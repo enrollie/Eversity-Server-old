@@ -7,15 +7,13 @@
 
 package by.enrollie.eversity.controllers
 
+import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import by.enrollie.eversity.exceptions.UserNotRegistered
-import by.enrollie.eversity.schools_by.SchoolsAPIClient
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import by.enrollie.eversity.security.EversityJWT
 import io.ktor.util.*
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.Logger
 
 class AuthController {
@@ -40,25 +38,15 @@ class AuthController {
      * @return Eversity access token
      */
     suspend fun registerUser(username: String, password: String): String {
-        val schoolsAPI = SchoolsAPIClient()
         val schoolsWeb = SchoolsWebWrapper()
-        val schoolsToken = schoolsAPI.getAPIToken(username, password) ?: throw AuthorizationUnsuccessful()
-        val userData = schoolsAPI.getCurrentUserData()
-        val userID = userData["id"].toString().toInt()
+        val credentials = schoolsWeb.login(username, password)
+        val userID = schoolsWeb.authenticatedUserID ?: throw AuthorizationUnsuccessful()
         if (doesUserExist(userID)) {
             return loginUser(username, password)
         }
-        val credentials = schoolsWeb.login(username, password)
-        when (userData["type"]?.jsonPrimitive?.content) {
-            "Pupil" -> {
-                val pupilData = schoolsAPI.getPupilInfo(userID.toString())
-                val classID: Int = pupilData["class_id"]?.jsonPrimitive?.content?.toInt() ?: {
-                    val unknownError =
-                        UnknownError("Class ID wasn't found in pupilData. Pupil data content: \'$pupilData\'")
-                    logger.error(unknownError)
-                    throw unknownError
-                }.toString().toInt()
-                val className = pupilData["class_name"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
+        when (schoolsWeb.userType) {
+            APIUserType.Pupil -> {
+                val (classID, className) = schoolsWeb.getPupilClass(userID)
                 if (!doesClassExist(classID)) {
                     try {
                         registrar.registerClass(classID, className, schoolsWeb)
@@ -69,134 +57,102 @@ class AuthController {
                 }
                 registerPupil(
                     userID,
-                    Pair(
-                        userData["first_name"]?.jsonPrimitive?.content.toString(),
-                        userData["last_name"]?.jsonPrimitive?.content.toString()
-                    ),
+                    schoolsWeb.getUserName(userID),
                     classID
                 )
                 insertOrUpdateCredentials(
                     userID,
-                    Triple(credentials.first, credentials.second, schoolsToken)
+                    Triple(credentials.first, credentials.second, "")
                 )
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
-            "Teacher" -> {
-                val classStr = schoolsWeb.fetchClassForCurrentUser()
-                if (classStr != null) {
-                    var className = userData["short_info"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
-                    kotlin.run {
-                        var numPosition: Int = -1
-                        className = className.filterIndexed { index, c ->
-                            if (c.digitToIntOrNull() != null) {
-                                numPosition = index
-                                return@filterIndexed true
-                            }
-                            if (numPosition != -1)
-                                return@filterIndexed true
-                            false
-                        }
-                        className = className.replace("-го", "")
-                    }
-                    registrar.registerClass(classStr, className, schoolsWeb)
+            APIUserType.Teacher -> {
+                val classData = schoolsWeb.fetchClassForCurrentUser()
+                if (classData != null) {
+                    registrar.registerClass(classData.first, classData.second, schoolsWeb)
+                    val name = schoolsWeb.getUserName(userID)
                     registerTeacher(
                         userID,
                         Triple(
-                            userData["first_name"]?.jsonPrimitive?.content.toString(),
-                            userData["father_name"]?.jsonPrimitive?.content.toString(),
-                            userData["last_name"]?.jsonPrimitive?.content.toString()
+                            name.first,
+                            name.second.split(" ")[1],
+                            name.second.split(" ").first()
                         ),
                         credentials,
-                        schoolsToken,
-                        classStr
+                        "",
+                        classData.first
                     )
                 } else {
+                    val name = schoolsWeb.getUserName(userID)
                     registerTeacher(
                         userID,
                         Triple(
-                            userData["first_name"]?.jsonPrimitive?.content.toString(),
-                            userData["father_name"]?.jsonPrimitive?.content.toString(),
-                            userData["last_name"]?.jsonPrimitive?.content.toString()
+                            name.first,
+                            name.second.split(" ")[1],
+                            name.second.split(" ").first()
                         ),
                         credentials,
-                        schoolsToken
+                        ""
                     )
                 }
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
-            "Parent"->{
+            APIUserType.Parent -> {
                 registerParent(userID)
+                insertOrUpdateCredentials(userID, Triple(credentials.first, credentials.second, ""))
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
-            "Administration"->{
+            APIUserType.Administration -> { //Not possible, as on website (without deep parsing) they are indistinguishable from regular teachers, but still
+                val name = schoolsWeb.getUserName(userID)
                 registerAdministration(
                     userID,
                     Triple(
-                        userData["first_name"]?.jsonPrimitive?.content.toString(),
-                        userData["father_name"]?.jsonPrimitive?.content.toString(),
-                        userData["last_name"]?.jsonPrimitive?.content.toString()
+                        name.first,
+                        name.second.split(" ")[1],
+                        name.second.split(" ").first()
                     ),
                     credentials,
-                    schoolsToken
+                    ""
                 )
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
             else -> {
-                logger.error("Unknown user type! userData JSON: \'$userData\'")
-                throw UnknownError("Unknown user type! userData JSON: \'$userData\'")
+                logger.error("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
+                throw UnknownError("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
             }
         }
     }
 
     suspend fun loginUser(username: String, password: String): String {
-        val schoolsAPI = SchoolsAPIClient()
         val schoolsWeb = SchoolsWebWrapper()
-        val schoolsToken = schoolsAPI.getAPIToken(username, password) ?: throw AuthorizationUnsuccessful()
-        val userData = schoolsAPI.getCurrentUserData()
-        val userID = userData["id"].toString().toInt()
+        val credentials = schoolsWeb.login(username, password)
+        val userID = schoolsWeb.authenticatedUserID ?: throw AuthorizationUnsuccessful()
         if (!doesUserExist(userID)) {
             throw UserNotRegistered("User with ID $userID is not registered")
         }
         try {
-            val credentials = obtainCredentials(userID)
-            if (credentials.first != null && credentials.second != null) {
-                if (!schoolsWeb.validateCookies(Pair(credentials.first!!, credentials.second!!), true)) {
+            val prevCredentials = obtainCredentials(userID)
+            if (prevCredentials.first != null && prevCredentials.second != null) {
+                if (!schoolsWeb.validateCookies(Pair(prevCredentials.first!!, prevCredentials.second!!), true)) {
                     logger.debug("Credentials of user with ID $userID were invalid, recreating...")
-                    val newCredentials = schoolsWeb.login(username, password)
                     insertOrUpdateCredentials(
                         userID,
-                        Triple(newCredentials.first, newCredentials.second, schoolsToken)
+                        Triple(credentials.first, credentials.second, "")
                     )
                 }
-                if (userData["type"]?.jsonPrimitive?.content.toString() == "Teacher") {
-                    val classStr = schoolsWeb.fetchClassForCurrentUser()
-                    var className = userData["short_info"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN"
-                    kotlin.run {
-                        if (className == "UNKNOWN")
-                            return@run
-                        var numPosition: Int = -1
-                        className = className.filterIndexed { index, c ->
-                            if (c.digitToIntOrNull() != null) {
-                                numPosition = index
-                                return@filterIndexed true
-                            }
-                            if (numPosition != -1)
-                                return@filterIndexed true
-                            false
-                        }
-                        className = className.replace("-го", "")
-                    }
-                    if (classStr != null)
-                        registrar.registerClass(classStr, className, schoolsWeb)
+                if (schoolsWeb.userType == APIUserType.Teacher) {
+                    val classData = schoolsWeb.fetchClassForCurrentUser()
+                    if (classData != null)
+                        registrar.registerClass(classData.first, classData.second, schoolsWeb)
                 }
             }
-            if (userData["type"]?.jsonPrimitive?.content.toString() == "Teacher") {
+            if (schoolsWeb.userType == APIUserType.Teacher) {
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
             }
         } catch (e: IllegalArgumentException) {
@@ -206,13 +162,13 @@ class AuthController {
             val newCredentials = schoolsWeb.login(username, password)
             insertOrUpdateCredentials(
                 userID,
-                Triple(newCredentials.first, newCredentials.second, schoolsToken)
+                Triple(newCredentials.first, newCredentials.second, "")
             )
         } catch (e: IllegalStateException) {
             val newCredentials = schoolsWeb.login(username, password)
             insertOrUpdateCredentials(
                 userID,
-                Triple(newCredentials.first, newCredentials.second, schoolsToken)
+                Triple(newCredentials.first, newCredentials.second, "")
             )
         }
         val token = issueToken(userID)

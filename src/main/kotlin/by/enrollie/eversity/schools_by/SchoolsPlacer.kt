@@ -7,20 +7,15 @@
 
 package by.enrollie.eversity.schools_by
 
-import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.data_classes.Mark
 import by.enrollie.eversity.data_classes.Pupil
-import by.enrollie.eversity.database.functions.batchInsertMarks
 import by.enrollie.eversity.exceptions.MarkAlreadyExistsException
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.util.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.Logger
@@ -116,8 +111,12 @@ class SchoolsPlacer : SchoolsWebWrapper {
         tokenAPI: String,
         date: String = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time)
     ): Pair<Int, List<Short>?> {
+        return Pair(absenceList.size, absenceList.map { it.first }) //Unfortunately, Schools.by killed their API,
+                                                                    //so currently sending absence data to them is not possible
+        /*
         val pupilTimetable = try {
-            SchoolsAPIClient(tokenAPI, APIUserType.Teacher).getSummaryForDay(pupil.id.toString(), date)
+            JsonObject(mapOf())
+//            SchoolsAPIClient(tokenAPI, APIUserType.Teacher).getSummaryForDay(pupil.id.toString(), date)
         } catch (e: UnknownError) {
             return Pair(absenceList.size, absenceList.map { it.first })
         }
@@ -191,5 +190,6 @@ class SchoolsPlacer : SchoolsWebWrapper {
         }
         batchInsertMarks(marksList.toList())
         return if (errorList.isEmpty()) Pair(0, null) else Pair(errorList.size, errorList)
+         */
     }
 }

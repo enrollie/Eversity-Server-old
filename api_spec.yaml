@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: "Eversity Server"
   description: "API documentation, which is the main way of interacting with Eversity"
-  version: 0.0.1
+  version: 0.1.0
 servers:
   - url: '{server}/api'
     description: "Current server"

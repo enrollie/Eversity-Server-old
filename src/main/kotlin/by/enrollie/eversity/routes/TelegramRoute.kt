@@ -10,8 +10,9 @@ package by.enrollie.eversity.routes
 import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.database.functions.doesUserExist
 import by.enrollie.eversity.database.functions.getUserType
+import by.enrollie.eversity.database.functions.obtainCredentials
 import by.enrollie.eversity.database.functions.removeTelegramNotifyData
-import by.enrollie.eversity.schools_by.SchoolsAPIClient
+import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -35,9 +36,6 @@ fun Route.telegramRoute() {
     authenticate("jwt") {
         route("/api/telegram") {
             get("/pair") {
-                repeat(random.nextInt(2, 15)) {
-                    random.nextInt()
-                }
                 val userJWT =
                     call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@get call.respond(
                         HttpStatusCode.Unauthorized,
@@ -84,10 +82,10 @@ fun Route.telegramRoute() {
                 var newCode = random.nextInt(100, 9999).toShort()
                 if (telegramPairingCodesList.find { it.first == newCode } != null)
                     newCode = random.nextInt(100, 9999).toShort()
-                val schoolsAPIClient =
-                    SchoolsAPIClient() //as Schools.by did not bother to secure data in their system, getting parent's pupils does not require any authorization
+
                 val pupilsList = try {
-                    schoolsAPIClient.fetchParentsPupils(parentID = userJWT.id)
+                    val creds = obtainCredentials(userJWT.id)
+                    SchoolsWebWrapper(Pair(creds.first.toString(), creds.second.toString())).fetchParentPupils(userJWT.id)
                 } catch (e: UnknownError) {
                     return@get call.respondText(
                         status = HttpStatusCode.FailedDependency,
@@ -113,7 +111,7 @@ fun Route.telegramRoute() {
                         it.first == newCode
                     }
                 }
-                return@get call.respond(
+                call.respond(
                     HttpStatusCode.OK, Json.encodeToString(
                         mapOf(
                             "pairID" to newCode.toString(),
@@ -121,6 +119,9 @@ fun Route.telegramRoute() {
                         )
                     )
                 )
+                repeat(random.nextInt(2, this.context.attributes.hashCode())) {
+                    random.nextInt()
+                }
             }
             post("/unpair") {
                 val userJWT =
