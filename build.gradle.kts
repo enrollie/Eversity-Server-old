@@ -122,7 +122,7 @@ tasks.create("stage") {
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
-    archiveClassifier.set("fatJar")
+    archiveClassifier.set("uberJar")
 }
 publishing{
     repositories {
@@ -137,7 +137,6 @@ publishing{
     }
     publications {
         register<MavenPublication>("gpr") {
-            from(components["java"])
             artifact(tasks["shadowJar"])
         }
     }
