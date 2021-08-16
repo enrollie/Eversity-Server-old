@@ -138,7 +138,7 @@ publishing{
     publications {
         register<MavenPublication>("gpr") {
             from(components["java"])
-            artifact("shadowJar")
+            artifact(tasks["shadowJar"])
         }
     }
 }
