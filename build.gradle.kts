@@ -122,7 +122,7 @@ tasks.create("stage") {
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
-    archiveClassifier.set("uber")
+    archiveClassifier.set("fatJar")
 }
 publishing{
     repositories {
