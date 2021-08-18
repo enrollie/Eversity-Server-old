@@ -42,9 +42,8 @@ class EversityPlacer(logger: Logger) {
 
     init {
         placerEngine = CoroutineScope(Dispatchers.Default).launch {
-            while (true) {
-                if (queue.isNotEmpty()) {
-//                    if (_schoolsByAvailable) {
+            if (queue.isNotEmpty()) {
+                if (_schoolsByAvailable) {
                     val element = queue.poll()
                     withContext(Dispatchers.IO + supervisorJob) {
                         launch(CoroutineExceptionHandler { _, throwable ->
@@ -60,10 +59,9 @@ class EversityPlacer(logger: Logger) {
                             }
                         }
                     }
-//                    }
                 }
-                delay(150)
             }
+            delay(150)
         }
         placerEngine.invokeOnCompletion {
             if (it != null) {
@@ -194,6 +192,10 @@ class EversityPlacer(logger: Logger) {
             exception = CredentialException("Credentials of job from queue are invalid. Pupil: ${placeJob.pupil};")
         }
         if (exception == null) {
+            //Commented out because there is no alternative for Schools.by API
+            //See https://github.com/enrollie/Eversity-Server/issues/1 for more details
+
+            /*
             val schoolsPlacement =
                 placer.placeAbsence(placeJob.pupil, placeJob.absenceList, credentials.second, placeJob.date)
             if (schoolsPlacement.first != 0) {
@@ -205,6 +207,7 @@ class EversityPlacer(logger: Logger) {
                     }; Pupil: ${placeJob.pupil};"
                 )
             }
+             */
         } else {
             log.warn(
                 "Absence for pupil ${placeJob.pupil} has not been placed to Schools.by, as exception was thrown before beginning of placing (Exception: ${exception.localizedMessage}; Stack trace: ${

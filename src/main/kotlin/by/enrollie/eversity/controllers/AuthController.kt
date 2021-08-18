@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.controllers
 
+import by.enrollie.eversity.LOCAL_ACCOUNT_ISSUER
 import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
@@ -130,6 +131,11 @@ class AuthController {
     }
 
     suspend fun loginUser(username: String, password: String): String {
+        if (username.startsWith("!_Eversity")) {
+            val localAccount = LOCAL_ACCOUNT_ISSUER.getUserID(username, password) ?: throw AuthorizationUnsuccessful()
+            val token = issueToken(localAccount)
+            return EversityJWT.instance.sign(localAccount.toString(), token)
+        }
         val schoolsWeb = SchoolsWebWrapper()
         val credentials = schoolsWeb.login(username, password)
         val userID = schoolsWeb.authenticatedUserID ?: throw AuthorizationUnsuccessful()

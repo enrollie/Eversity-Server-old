@@ -177,10 +177,20 @@ open class SchoolsWebWrapper {
             finalCSRFresponse.headers["location"]?.contains("pupil") == true -> APIUserType.Pupil
             finalCSRFresponse.headers["location"]?.contains("teacher") == true -> APIUserType.Teacher
             finalCSRFresponse.headers["location"]?.contains("parent") == true -> APIUserType.Parent
+            finalCSRFresponse.headers["location"]?.contains("administration") == true -> APIUserType.Administration
             else -> null
         }
         authenticatedUserID =
-            finalCSRFresponse.headers["location"]?.let{ println(it.removeRange(0, it.lastIndexOf('/'))); it.removeRange(0, it.lastIndexOf('/')+1)}?.toIntOrNull()
+            finalCSRFresponse.headers["location"]?.let {
+                val newIt = it.removeRange(0, it.lastIndexOf('/') + 1)
+                if (newIt.toIntOrNull() == null) {
+                    var teacherData =
+                        it.removeSuffix(newIt)
+                    teacherData = teacherData.removeSuffix("/")
+                    teacherData = teacherData.removeRange(0, teacherData.lastIndexOf('/') + 1)
+                    teacherData
+                } else newIt
+            }?.toIntOrNull()
         return schoolsBYCookies
     }
 
@@ -581,7 +591,7 @@ open class SchoolsWebWrapper {
                     findAll {
                         for (list in this) {
                             if (try {
-                                    list.table { }
+                                    list.table { findFirst {  }}
                                     false
                                 } catch (e: ElementNotFoundException) {
                                     true
@@ -607,8 +617,8 @@ open class SchoolsWebWrapper {
                                                 findSecond {
                                                     a {
                                                         findFirst {
-                                                            attribute("href").apply {
-                                                                removeRange(0, lastIndexOf('/'))
+                                                            attribute("href").let {
+                                                                it.removeRange(0, it.lastIndexOf('/'))
                                                             }.toIntOrNull()
                                                         }
                                                     }

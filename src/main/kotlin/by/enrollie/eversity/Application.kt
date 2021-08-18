@@ -10,6 +10,7 @@
 package by.enrollie.eversity
 
 import by.enrollie.eversity.controllers.AuthController
+import by.enrollie.eversity.controllers.LocalLoginIssuer
 import by.enrollie.eversity.controllers.Registrar
 import by.enrollie.eversity.data_classes.SchoolNameDeclensions
 import by.enrollie.eversity.database.initDatabase
@@ -38,6 +39,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.joda.time.DateTime
 import org.joda.time.Minutes
 import java.io.File
@@ -50,10 +53,17 @@ private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 lateinit var EversityBot: EversityNotifier
+    private set
 lateinit var N_Placer: EversityPlacer //name is taken from my previous project
+    private set
 lateinit var SchoolsCredentialsChecker: CredentialsChecker
+    private set
 lateinit var SCHOOL_NAME: SchoolNameDeclensions
+    private set
 lateinit var SCHOOL_WEBSITE: String
+    private set
+lateinit var LOCAL_ACCOUNT_ISSUER: LocalLoginIssuer
+    private set
 
 /**
  * Starts given action and repeats it every (repeatMillis) milliseconds
@@ -89,6 +99,7 @@ fun Application.module(testing: Boolean = false) {
         EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
         EVERSITY_BUILD_DATE = props.getProperty("buildDate")
     }
+    log.debug("Eversity ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
     kotlin.run {
         val namingFileName = System.getProperty("SCHOOL_NAMING_FILE", "school_naming.properties")
         val namingFile = File(namingFileName)
@@ -138,6 +149,14 @@ fun Application.module(testing: Boolean = false) {
             environment.config.config("eversity").property("autoCredentialsRecheck").getString().toInt(),
             org.slf4j.LoggerFactory.getLogger("Schools.by")
         )
+    kotlin.run {
+        val localFile = File(environment.config.config("eversity").property("localAccountsFilePath").getString())
+        LOCAL_ACCOUNT_ISSUER =
+            if (!localFile.exists()) {
+                log.warn("Local accounts file is not available at path \'${localFile.absolutePath}\'! No local accounts will be available")
+                LocalLoginIssuer(mapOf())
+            } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
+    }
 
     configureAuthentication()
     configureHTTP()
@@ -179,7 +198,6 @@ fun Application.module(testing: Boolean = false) {
         if (isSchoolsByAvailable != N_Placer.getSchoolsByAvailability())
             N_Placer.setSchoolsByAvailability(isSchoolsByAvailable)
     }
-
 }
 
 private suspend fun checkSchoolsByAvailability(): Boolean {
