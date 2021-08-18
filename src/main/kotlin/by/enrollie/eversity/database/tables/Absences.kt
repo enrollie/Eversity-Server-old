@@ -13,6 +13,7 @@ import org.jetbrains.exposed.sql.jodatime.date
 object Absences:Table() {
     val pupilID = (integer("pupilid") references Pupils.id).nullable()
     val classID = (integer("classid") references Classes.classID)
+    var absenceList = text("absenceslist")
     val date = date("date")
     val reason = varchar("reason", 12)
 }

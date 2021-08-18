@@ -9,13 +9,17 @@ package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.data_classes.Mark
 import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.database.tables.Absences
 import by.enrollie.eversity.database.tables.Marks
 import by.enrollie.eversity.database.tables.Pupils
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.Random
 
 fun insertMark(mark: Mark, journalID: Int, lessonID: Int) {
     require(doesUserExist(mark.pupil.id)) { "Pupil with ID ${mark.pupil.id} does not exist" }
@@ -38,12 +42,13 @@ fun insertMark(mark: Mark, journalID: Int, lessonID: Int) {
 
 fun getClassJournal(classID: Int): Pair<List<Pupil>, List<Mark>> {
     require(doesClassExist(classID)) { "Class with ID $classID was not found" }
-    val (pupils, marks) = transaction {
+    val random = Random()
+    val (pupils, marksArrays) = transaction {
         val pupils =
             Pupils.select {
                 Pupils.classID eq classID
             }.toList().map { Pupil(it[Pupils.id], it[Pupils.firstName], it[Pupils.lastName], it[Pupils.classID]) }
-        Pair(pupils,
+        Pair(pupils,/*
             Marks.select {
                 (Marks.classID eq classID) and (Marks.date eq DateTime.now().toString("YYYY-MM-dd"))
             }.toList().map { mark ->
@@ -58,6 +63,27 @@ fun getClassJournal(classID: Int): Pair<List<Pupil>, List<Mark>> {
                         classID
                     ))
             })
+            */
+            Absences.select {
+                (Absences.classID eq classID) and (Absences.date eq DateTime.now()) and (Absences.pupilID neq null)
+            }.toList().map { absence ->
+                val marksLists = Json.decodeFromString<List<Short>>(absence[Absences.absenceList])
+                marksLists.map {
+                    Mark(
+                        random.nextInt(), -1, it, pupils.find { it.id == absence[Absences.pupilID] } ?: Pupil(
+                            absence[Absences.pupilID] ?: 0,
+                            "UNKNOWN",
+                            "REPORT THIS TO ENROLLIE",
+                            classID
+                        ))
+                }
+            })
+    }
+    val marks = mutableListOf<Mark>()
+    for (markList in marksArrays) {
+        markList.forEach {
+            marks += it
+        }
     }
     return Pair(pupils, marks)
 }

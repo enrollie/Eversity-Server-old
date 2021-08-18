@@ -270,7 +270,8 @@ fun Route.absenceRoute() {
                     for (absence in absenceJob) {
                         val name = getUserName(absence.pupilID, APIUserType.Pupil)
                         val credentials = obtainCredentials(user.id)
-                        if (credentials.first == null || credentials.second == null)
+                        if (credentials.first == null || credentials.second == null) {
+                            invalidateAllTokens(user.id, "INVALID_CREDENTIALS")
                             return@post call.respondText(
                                 text = Json.encodeToString(
                                     mapOf(
@@ -279,6 +280,7 @@ fun Route.absenceRoute() {
                                     )
                                 ), status = HttpStatusCode.PreconditionFailed
                             )
+                        }
                         val placementJob = PlaceJob(
                             Pupil(absence.pupilID, name.first, name.third, classID),
                             absence.absenceList,
@@ -307,7 +309,7 @@ fun Route.absenceRoute() {
                 return@post call.respondText(
                     text = Json.encodeToString(
                         mapOf(
-                            "type" to if (statusID.startsWith("gp")) "group" else "single",
+                            "type" to if (statusID.startsWith("gr")) "group" else "single",
                             "ID" to statusID
                         )
                     ),

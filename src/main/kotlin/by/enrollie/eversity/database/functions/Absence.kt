@@ -12,26 +12,39 @@ import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.database.tables.Absences
 import by.enrollie.eversity.database.tables.Classes
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 
-fun insertAbsence(pupil: Pupil, reason: AbsenceReason, date: DateTime) {
+fun insertAbsence(pupil: Pupil, reason: AbsenceReason, date: DateTime, absenceList: List<Pair<Short, Boolean>>) {
     if (pupil.id != -1)
         require(doesUserExist(pupil.id)) { "Pupil with ID ${pupil.id} does not exist" }
     require(doesClassExist(pupil.classID)) { "Class with ID ${pupil.classID} does not exist" }
     transaction {
+        val existingAbsenceList = Absences.select {
+            (Absences.pupilID eq pupil.id) and (Absences.date eq date)
+        }.toList().firstOrNull()?.let {
+            Json.decodeFromString<List<Short>>(it[Absences.absenceList])
+        }
+        val filteredAbsenceList = existingAbsenceList?.filter { lesson ->
+            absenceList.find { it.first == lesson }?.let { !it.second } != true
+        }?.plus(absenceList.filter { it.second }.map { it.first })?.toSet()
         Absences.deleteWhere {
             (Absences.pupilID eq pupil.id) and (Absences.date eq date)
         }
         if (pupil.id == -1)
             Absences.deleteWhere { (Absences.classID eq pupil.classID) and (Absences.date eq date) }
         else Absences.deleteWhere { (Absences.classID eq pupil.classID) and (Absences.pupilID eq null) and (Absences.date eq date) }
-        Absences.insertIgnore {
-            it[pupilID] = if (pupil.id == -1) null else pupil.id
-            it[classID] = pupil.classID
-            it[Absences.date] = date
-            it[Absences.reason] = reason.name
+        Absences.insertIgnore { builder ->
+            builder[pupilID] = if (pupil.id == -1) null else pupil.id
+            builder[classID] = pupil.classID
+            builder[Absences.date] = date
+            builder[Absences.reason] = reason.name
+            builder[Absences.absenceList] =
+                Json.encodeToString(filteredAbsenceList ?: absenceList.filter { it.second }.map { it.first }.toSet())
         }
     }
 }
@@ -60,8 +73,8 @@ fun getClassAbsence(classID: Int, startDate: String, endDate: String): Set<Absen
     return transaction {
         Absences.select {
             (Absences.classID eq classID) and
-            (Absences.pupilID neq null) and
-            (Absences.date greaterEq startDateTime)
+                    (Absences.pupilID neq null) and
+                    (Absences.date greaterEq startDateTime)
         }.toList().filter {
             it[Absences.date] <= endDateTime && it[Absences.pupilID] != null
         }.map {
@@ -69,11 +82,8 @@ fun getClassAbsence(classID: Int, startDate: String, endDate: String): Set<Absen
                 it[Absences.pupilID]!!,
                 it[Absences.classID],
                 it[Absences.date].toString("YYYY-MM-dd"),
-                try {
-                    AbsenceReason.valueOf(it[Absences.reason])
-                } catch (e: IllegalArgumentException) {
-                    AbsenceReason.UNKNOWN
-                }
+                AbsenceReason.valueOf(it[Absences.reason]),
+                Json.decodeFromString(it[Absences.absenceList])
             )
         }.toSet()
     }
@@ -87,19 +97,16 @@ fun getClassAbsence(classID: Int, day: String): Set<Absence> {
     val requiredDateTime = DateTime.parse(day)
     return transaction {
         Absences.select {
-           ( Absences.classID eq classID) and
-            (Absences.date eq requiredDateTime) and
-            (Absences.pupilID neq null)
+            (Absences.classID eq classID) and
+                    (Absences.date eq requiredDateTime) and
+                    (Absences.pupilID neq null)
         }.toList().map {
             Absence(
                 it[Absences.pupilID]!!,
                 it[Absences.classID],
                 it[Absences.date].toString("YYYY-MM-dd"),
-                try {
-                    AbsenceReason.valueOf(it[Absences.reason])
-                } catch (e: IllegalArgumentException) {
-                    AbsenceReason.UNKNOWN
-                }
+                AbsenceReason.valueOf(it[Absences.reason]),
+                Json.decodeFromString(it[Absences.absenceList])
             )
         }.toSet()
     }
@@ -113,18 +120,15 @@ fun getClassAbsence(classID: Int): Set<Absence> {
     return transaction {
         Absences.select {
             (Absences.classID eq classID) and
-            (Absences.date eq DateTime.now()) and
-            (Absences.pupilID neq null)
+                    (Absences.date eq DateTime.now()) and
+                    (Absences.pupilID neq null)
         }.toList().map {
             Absence(
                 it[Absences.pupilID]!!,
                 it[Absences.classID],
                 it[Absences.date].toString("YYYY-MM-dd"),
-                try {
-                    AbsenceReason.valueOf(it[Absences.reason])
-                } catch (e: IllegalArgumentException) {
-                    AbsenceReason.UNKNOWN
-                }
+                AbsenceReason.valueOf(it[Absences.reason]),
+                Json.decodeFromString(it[Absences.absenceList])
             )
         }.toSet()
     }
@@ -144,7 +148,8 @@ fun getAbsenceStatistics(date: DateTime = DateTime.now()): Pair<Map<AbsenceReaso
                     it[Absences.pupilID]!!,
                     it[Absences.classID],
                     it[Absences.date].toString("YYYY-MM-dd"),
-                    AbsenceReason.valueOf(it[Absences.reason])
+                    AbsenceReason.valueOf(it[Absences.reason]),
+                    Json.decodeFromString(it[Absences.absenceList])
                 )
             },
             Classes.selectAll().toList().map { Pair(it[Classes.classID], it[Classes.isSecondShift]) }
@@ -181,11 +186,8 @@ fun getNoAbsenceDataClasses(date: DateTime = DateTime.now()): List<Triple<Int, S
                 it[Absences.pupilID] ?: -1,
                 it[Absences.classID],
                 it[Absences.date].toString("YYYY-MM-dd"),
-                try {
-                    AbsenceReason.valueOf(it[Absences.reason])
-                } catch (e: IllegalArgumentException) {
-                    AbsenceReason.UNKNOWN
-                }
+                AbsenceReason.valueOf(it[Absences.reason]),
+                Json.decodeFromString(it[Absences.absenceList])
             )
         }.toSet(),
             Classes.selectAll().toList()

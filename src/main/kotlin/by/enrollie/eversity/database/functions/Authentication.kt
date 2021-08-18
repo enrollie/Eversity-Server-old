@@ -188,8 +188,6 @@ fun validateTeacherAccessToClass(teacherID: Int, classID: Int): Boolean {
         val isClassTeacher =
             Classes.select { Classes.classTeacher eq teacherID }.toList().any { it[Classes.classID] == classID }
         if (isClassTeacher) {
-            println("Class")
-            println(teacherID)
             return@transaction true
         }
         val teacherTimetable = TeachersTimetable.select { TeachersTimetable.id eq teacherID }.toList().firstOrNull()

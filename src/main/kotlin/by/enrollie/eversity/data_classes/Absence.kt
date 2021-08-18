@@ -10,4 +10,11 @@ package by.enrollie.eversity.data_classes
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Absence(val pupilID:Int, val classID: Int, val date: String, val reason: AbsenceReason)
+data class Absence(
+    val pupilID: Int,
+    val classID: Int,
+    val date: String,
+    val reason: AbsenceReason,
+    val lessonsList: List<Short> //List of lessons places, that pupil will be absent from
+                                 //Consequence of Schools.by disabling their API
+)

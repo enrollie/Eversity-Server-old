@@ -9,13 +9,11 @@ package by.enrollie.eversity.placer
 
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.database.functions.insertAbsence
-import by.enrollie.eversity.database.functions.removeAbsence
 import by.enrollie.eversity.exceptions.SchoolsByNotAvailableException
 import by.enrollie.eversity.notifier.EversityNotifier
 import by.enrollie.eversity.notifier.data_classes.NotifyJob
 import by.enrollie.eversity.placer.data_classes.PlaceJob
 import by.enrollie.eversity.placer.data_classes.PlacingStatus
-import by.enrollie.eversity.schools_by.SchoolsPlacer
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.util.*
 import kotlinx.coroutines.*
@@ -42,26 +40,28 @@ class EversityPlacer(logger: Logger) {
 
     init {
         placerEngine = CoroutineScope(Dispatchers.Default).launch {
-            if (queue.isNotEmpty()) {
-                if (_schoolsByAvailable) {
-                    val element = queue.poll()
-                    withContext(Dispatchers.IO + supervisorJob) {
-                        launch(CoroutineExceptionHandler { _, throwable ->
-                            _jobStatuses[element.first] = PlacingStatus.ERROR
-                            log.error(throwable)
-                        }) {
-                            _jobStatuses[element.first] = PlacingStatus.RUNNING
-                            val absenceResult = setAbsence(element.second)
-                            if (absenceResult != null) {
+            while (true) {
+                if (queue.isNotEmpty()) {
+                    if (_schoolsByAvailable) {
+                        val element = queue.poll()
+                        withContext(Dispatchers.IO + supervisorJob) {
+                            launch(CoroutineExceptionHandler { _, throwable ->
                                 _jobStatuses[element.first] = PlacingStatus.ERROR
-                            } else {
-                                _jobStatuses[element.first] = PlacingStatus.DONE
+                                log.error(throwable)
+                            }) {
+                                _jobStatuses[element.first] = PlacingStatus.RUNNING
+                                val absenceResult = setAbsence(element.second)
+                                if (absenceResult != null) {
+                                    _jobStatuses[element.first] = PlacingStatus.ERROR
+                                } else {
+                                    _jobStatuses[element.first] = PlacingStatus.DONE
+                                }
                             }
                         }
                     }
                 }
+                delay(150)
             }
-            delay(150)
         }
         placerEngine.invokeOnCompletion {
             if (it != null) {
@@ -175,22 +175,22 @@ class EversityPlacer(logger: Logger) {
      */
     private suspend fun setAbsence(placeJob: PlaceJob): Exception? {
         if (placeJob.pupil.id == -1) {
-            if (placeJob.absenceList.contains(Pair(0, true)) || placeJob.absenceList.contains(Pair(1, true))) {
-                insertAbsence(placeJob.pupil, AbsenceReason.UNKNOWN, DateTime.parse(placeJob.date))
-            } else {
-                if (placeJob.absenceList.contains(Pair(0, false)) || placeJob.absenceList.contains(Pair(1, false)))
-                    removeAbsence(placeJob.pupil, DateTime.parse(placeJob.date))
-            }
+            insertAbsence(
+                placeJob.pupil,
+                AbsenceReason.UNKNOWN,
+                DateTime.parse(placeJob.date),
+                placeJob.absenceList
+            )
             return null
         }
-        val credentials = placeJob.credentials
-        val placer = SchoolsPlacer(credentials.first)
+//        val credentials = placeJob.credentials
+//        val placer = SchoolsPlacer(credentials.first)
         var exception: Exception? = null
         if (!_schoolsByAvailable)
             exception = SchoolsByNotAvailableException("Schools.by is not available at the start of absence setter")
-        if (exception == null && !placer.validateCookies(changeInternal = false)) {
-            exception = CredentialException("Credentials of job from queue are invalid. Pupil: ${placeJob.pupil};")
-        }
+//        if (exception == null && !placer.validateCookies(changeInternal = false)) {
+//            exception = CredentialException("Credentials of job from queue are invalid. Pupil: ${placeJob.pupil};")
+//        }
         if (exception == null) {
             //Commented out because there is no alternative for Schools.by API
             //See https://github.com/enrollie/Eversity-Server/issues/1 for more details
@@ -217,17 +217,14 @@ class EversityPlacer(logger: Logger) {
                 }"
             )
         }
+        insertAbsence(placeJob.pupil, placeJob.reason, DateTime.parse(placeJob.date), placeJob.absenceList)
         if (placeJob.absenceList.contains(Pair(0, true)) || placeJob.absenceList.contains(Pair(1, true))) {
-            insertAbsence(placeJob.pupil, placeJob.reason, DateTime.parse(placeJob.date))
             EversityNotifier.notifyChannel.send(
                 NotifyJob(
                     placeJob.pupil,
                     placeJob.date,
                     placeJob.absenceList.map { it.first })
             )
-        } else {
-            if (placeJob.absenceList.contains(Pair(0, false)) || placeJob.absenceList.contains(Pair(1, false)))
-                removeAbsence(placeJob.pupil, DateTime.parse(placeJob.date))
         }
         return exception
     }
