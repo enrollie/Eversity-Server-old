@@ -99,7 +99,7 @@ fun Application.module(testing: Boolean = false) {
         EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
         EVERSITY_BUILD_DATE = props.getProperty("buildDate")
     }
-    log.debug("Eversity ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
+    log.debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
     kotlin.run {
         val namingFileName = System.getProperty("SCHOOL_NAMING_FILE", "school_naming.properties")
         val namingFile = File(namingFileName)

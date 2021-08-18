@@ -21,17 +21,17 @@
         </Console>
     </Appenders>
     <Loggers>
-        <Logger name="MainLogger" level="debug" additivity="true">
-            <appender-ref ref="fileLogger" level="debug"/>
+        <Logger name="MainLogger" level="trace" additivity="true">
+            <appender-ref ref="fileLogger" level="trace"/>
             <appender-ref ref="console" level="trace"/>
         </Logger>
-        <Logger name="Schools.by" level="debug" additivity="false">
-            <appender-ref ref="fileLogger" level="debug"/>
+        <Logger name="Schools.by" level="trace" additivity="false">
+            <appender-ref ref="fileLogger" level="trace"/>
             <appender-ref ref="console" level="trace"/>
         </Logger>
-        <Logger name="Eversity" level="debug" additivity="true">
-            <appender-ref ref="fileLogger" level="debug"/>
-            <appender-ref ref="console" level="debug"/>
+        <Logger name="Eversity" level="trace" additivity="true">
+            <appender-ref ref="fileLogger" level="trace"/>
+            <appender-ref ref="console" level="trace"/>
         </Logger>
         <Logger name="org.eclipse.jetty" level="INFO" additivity="true">
             <appender-ref ref="fileLogger" level="info"/>
@@ -43,7 +43,7 @@
         </Logger>
         <Root level="debug" additivity="false">
             <appender-ref ref="console" level="trace"/>
-            <appender-ref ref="fileLogger" level="info"/>
+            <appender-ref ref="fileLogger" level="trace"/>
         </Root>
     </Loggers>
 </Configuration>
