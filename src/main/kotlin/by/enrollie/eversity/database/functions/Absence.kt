@@ -19,7 +19,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 
-fun insertAbsence(pupil: Pupil, reason: AbsenceReason, date: DateTime, absenceList: List<Pair<Short, Boolean>>) {
+fun insertAbsence(pupil: Pupil, reason: AbsenceReason?, date: DateTime, absenceList: List<Pair<Short, Boolean>>) {
     if (pupil.id != -1)
         require(doesUserExist(pupil.id)) { "Pupil with ID ${pupil.id} does not exist" }
     require(doesClassExist(pupil.classID)) { "Class with ID ${pupil.classID} does not exist" }
@@ -38,14 +38,16 @@ fun insertAbsence(pupil: Pupil, reason: AbsenceReason, date: DateTime, absenceLi
         if (pupil.id == -1)
             Absences.deleteWhere { (Absences.classID eq pupil.classID) and (Absences.date eq date) }
         else Absences.deleteWhere { (Absences.classID eq pupil.classID) and (Absences.pupilID eq null) and (Absences.date eq date) }
-        Absences.insertIgnore { builder ->
-            builder[pupilID] = if (pupil.id == -1) null else pupil.id
-            builder[classID] = pupil.classID
-            builder[Absences.date] = date
-            builder[Absences.reason] = reason.name
-            builder[Absences.absenceList] =
-                Json.encodeToString(filteredAbsenceList ?: absenceList.filter { it.second }.map { it.first }.toSet())
-        }
+        if (reason != null && (filteredAbsenceList ?: absenceList.filter { it.second }).isNotEmpty())
+            Absences.insertIgnore { builder ->
+                builder[pupilID] = if (pupil.id == -1) null else pupil.id
+                builder[classID] = pupil.classID
+                builder[Absences.date] = date
+                builder[Absences.reason] = reason.name
+                builder[Absences.absenceList] =
+                    Json.encodeToString(filteredAbsenceList ?: absenceList.filter { it.second }.map { it.first }
+                        .toSet())
+            }
     }
 }
 
@@ -85,7 +87,7 @@ fun getClassAbsence(classID: Int, startDate: String, endDate: String): Set<Absen
                 AbsenceReason.valueOf(it[Absences.reason]),
                 Json.decodeFromString(it[Absences.absenceList])
             )
-        }.toSet()
+        }.filter { it.lessonsList.isNotEmpty() }.toSet()
     }
 }
 
@@ -108,7 +110,7 @@ fun getClassAbsence(classID: Int, day: String): Set<Absence> {
                 AbsenceReason.valueOf(it[Absences.reason]),
                 Json.decodeFromString(it[Absences.absenceList])
             )
-        }.toSet()
+        }.filter { it.lessonsList.isNotEmpty() }.toSet()
     }
 }
 
@@ -130,7 +132,7 @@ fun getClassAbsence(classID: Int): Set<Absence> {
                 AbsenceReason.valueOf(it[Absences.reason]),
                 Json.decodeFromString(it[Absences.absenceList])
             )
-        }.toSet()
+        }.filter { it.lessonsList.isNotEmpty() }.toSet()
     }
 }
 
@@ -151,7 +153,7 @@ fun getAbsenceStatistics(date: DateTime = DateTime.now()): Pair<Map<AbsenceReaso
                     AbsenceReason.valueOf(it[Absences.reason]),
                     Json.decodeFromString(it[Absences.absenceList])
                 )
-            },
+            }.filter { it.lessonsList.isNotEmpty() },
             Classes.selectAll().toList().map { Pair(it[Classes.classID], it[Classes.isSecondShift]) }
         )
     }

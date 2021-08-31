@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.database.functions
 
+import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.Mark
 import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.database.tables.Absences
@@ -40,10 +41,10 @@ fun insertMark(mark: Mark, journalID: Int, lessonID: Int) {
     }
 }
 
-fun getClassJournal(classID: Int): Pair<List<Pupil>, List<Mark>> {
+fun getClassJournal(classID: Int): Triple<List<Pupil>, List<Mark>, Map<Pupil, AbsenceReason>> {
     require(doesClassExist(classID)) { "Class with ID $classID was not found" }
     val random = Random()
-    val (pupils, marksArrays) = transaction {
+    val (pupils, marksAndAbsences) = transaction {
         val pupils =
             Pupils.select {
                 Pupils.classID eq classID
@@ -68,24 +69,31 @@ fun getClassJournal(classID: Int): Pair<List<Pupil>, List<Mark>> {
                 (Absences.classID eq classID) and (Absences.date eq DateTime.now()) and (Absences.pupilID neq null)
             }.toList().map { absence ->
                 val marksLists = Json.decodeFromString<List<Short>>(absence[Absences.absenceList])
-                marksLists.map {
-                    Mark(
-                        random.nextInt(), -1, it, pupils.find { it.id == absence[Absences.pupilID] } ?: Pupil(
-                            absence[Absences.pupilID] ?: 0,
-                            "UNKNOWN",
-                            "REPORT THIS TO ENROLLIE",
-                            classID
-                        ))
-                }
+                Pair(
+                    marksLists.map {
+                        Mark(
+                            random.nextInt(), -1, it, pupils.find { it.id == absence[Absences.pupilID] } ?: Pupil(
+                                absence[Absences.pupilID] ?: 0,
+                                "UNKNOWN",
+                                "REPORT THIS TO ENROLLIE",
+                                classID
+                            ))
+                    },
+                    AbsenceReason.valueOf(absence[Absences.reason])
+                )
             })
     }
     val marks = mutableListOf<Mark>()
-    for (markList in marksArrays) {
-        markList.forEach {
+    val absences = mutableMapOf<Pupil, AbsenceReason>()
+    for (markList in marksAndAbsences) {
+        markList.first.forEach {
             marks += it
         }
+        markList.first.firstOrNull()?.let {
+            absences[it.pupil] = markList.second
+        }
     }
-    return Pair(pupils, marks)
+    return Triple(pupils,marks,absences)
 }
 
 fun batchInsertMarks(marksList: List<Pair<Mark, Pair<Int, Int>>>) {

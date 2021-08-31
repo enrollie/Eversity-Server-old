@@ -9,7 +9,7 @@ package by.enrollie.eversity.data_classes
 
 /**
  * Declensions of school's (where instance of Eversity is running) name.
- * All of fields are commented in Russian
+ * All fields are commented in Russian
  */
 data class SchoolNameDeclensions(
     /**

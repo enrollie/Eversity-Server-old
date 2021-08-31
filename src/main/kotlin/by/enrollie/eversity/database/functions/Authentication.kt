@@ -120,7 +120,7 @@ fun checkToken(userID: Int, token: String): Pair<Boolean, String?> {
     val foundInValid = transaction {
         Tokens.select {
             (Tokens.userID eq userID) and
-            (Tokens.token eq token)
+                    (Tokens.token eq token)
         }.toList().isNotEmpty()
     }
     if (foundInValid) {
@@ -181,7 +181,7 @@ fun batchValidatePupilAccess(pupilsList: List<Int>, teacherID: Int): List<Pair<I
     return illegalAccessList
 }
 
-fun validateTeacherAccessToClass(teacherID: Int, classID: Int): Boolean {
+fun validateTeacherWriteAccessToClass(teacherID: Int, classID: Int): Boolean {
     require(doesUserExist(teacherID)) { "Teacher with ID $teacherID does not exist" }
     require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
     return transaction {
@@ -209,6 +209,39 @@ fun validateTeacherAccessToClass(teacherID: Int, classID: Int): Boolean {
         } else false
         val isSecondShiftTeacher = if (dayTimetable.second != null) {
             dayTimetable.second!!.firstOrNull()?.place == 1.toShort() && dayTimetable.second!!.firstOrNull()?.classID == classID
+        } else false
+        return@transaction isFirstShiftTeacher || isSecondShiftTeacher
+    }
+}
+
+fun validateTeacherAccessToClass(teacherID: Int, classID: Int): Boolean {
+    require(doesUserExist(teacherID)) { "Teacher with ID $teacherID does not exist" }
+    require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
+    return transaction {
+        val isClassTeacher =
+            Classes.select { Classes.classTeacher eq teacherID }.toList().any { it[Classes.classID] == classID }
+        if (isClassTeacher) {
+            return@transaction true // Class teachers always have access to classes
+        }
+        val teacherTimetable = TeachersTimetable.select { TeachersTimetable.id eq teacherID }.toList().firstOrNull()
+            ?: return@transaction false
+        val dayTimetable =
+            Json.decodeFromString<Pair<Array<TeacherLesson>?, Array<TeacherLesson>?>>(
+                teacherTimetable[when (DayOfWeek.values()[DateTime.now().dayOfWeek - 1]) {
+                    DayOfWeek.MONDAY -> TeachersTimetable.monday
+                    DayOfWeek.TUESDAY -> TeachersTimetable.tuesday
+                    DayOfWeek.WEDNESDAY -> TeachersTimetable.wednesday
+                    DayOfWeek.THURSDAY -> TeachersTimetable.thursday
+                    DayOfWeek.FRIDAY -> TeachersTimetable.friday
+                    DayOfWeek.SATURDAY -> TeachersTimetable.saturday
+                    else -> return@transaction false
+                }]
+            )
+        val isFirstShiftTeacher = if (dayTimetable.first != null) {
+            dayTimetable.first!!.find { it.classID == classID } != null
+        } else false
+        val isSecondShiftTeacher = if (dayTimetable.second != null) {
+            dayTimetable.second!!.find { it.classID == classID } != null
         } else false
         return@transaction isFirstShiftTeacher || isSecondShiftTeacher
     }

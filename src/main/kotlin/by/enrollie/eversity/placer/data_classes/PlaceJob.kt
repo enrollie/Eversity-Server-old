@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
 data class PlaceJob(
     val pupil: Pupil,
     val absenceList: List<Pair<Short, Boolean>>,
-    val reason: AbsenceReason,
+    val reason: AbsenceReason?,
     val credentials: Pair<Pair<String, String>, String>,
     val date:String
 )

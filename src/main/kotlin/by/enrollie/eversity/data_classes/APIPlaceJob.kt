@@ -14,6 +14,6 @@ data class APIPlaceJob(
     val pupilID: Int,
     val classID: Int,
     val absenceList: List<Pair<Short, Boolean>>,
-    val reason: AbsenceReason,
+    val reason: AbsenceReason?,
     val date: String
 )

@@ -17,6 +17,7 @@ import by.enrollie.eversity.placer.data_classes.PlacingStatus
 import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.util.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BroadcastChannel
 import org.joda.time.DateTime
 import org.slf4j.Logger
 import java.util.*
@@ -38,6 +39,8 @@ class EversityPlacer(logger: Logger) {
 
     private var queue: Queue<Pair<String, PlaceJob>> = LinkedList() //Placement queue
 
+    val jobsStatusBroadcast = BroadcastChannel<Pair<String, PlacingStatus>>(100)
+
     init {
         placerEngine = CoroutineScope(Dispatchers.Default).launch {
             while (true) {
@@ -50,12 +53,24 @@ class EversityPlacer(logger: Logger) {
                                 log.error(throwable)
                             }) {
                                 _jobStatuses[element.first] = PlacingStatus.RUNNING
+                                jobsStatusBroadcast.send(
+                                    Pair(
+                                        element.first,
+                                        _jobStatuses[element.first] ?: PlacingStatus.ERROR
+                                    )
+                                )
                                 val absenceResult = setAbsence(element.second)
                                 if (absenceResult != null) {
                                     _jobStatuses[element.first] = PlacingStatus.ERROR
                                 } else {
                                     _jobStatuses[element.first] = PlacingStatus.DONE
                                 }
+                                jobsStatusBroadcast.send(
+                                    Pair(
+                                        element.first,
+                                        _jobStatuses[element.first] ?: PlacingStatus.ERROR
+                                    )
+                                )
                             }
                         }
                     }
@@ -154,16 +169,13 @@ class EversityPlacer(logger: Logger) {
      * @param jobGroupID Job group ID (starts with "gr")
      * @throws IllegalArgumentException Thrown, if job group ID was not found
      */
-    fun checkJobGroupStatus(jobGroupID: String): Map<PlacingStatus, List<String>> {
+    fun checkJobGroupStatus(jobGroupID: String): Map<String, PlacingStatus> {
         require(_jobGroups.containsKey(jobGroupID)) { "Group list does not contain group ID $jobGroupID" }
-        val resultMap = mutableMapOf<PlacingStatus, List<String>>()
-        for (i in PlacingStatus.values()) {
-            resultMap[i] = listOf()
-        }
+        val resultMap = mutableMapOf<String, PlacingStatus>()
         val jobsList = _jobGroups[jobGroupID]!!
         for (job in jobsList) {
             val currentJobStatus = checkJobStatus(job)
-            resultMap[currentJobStatus] = resultMap[currentJobStatus]?.plus(job)!!
+            resultMap[job] = currentJobStatus
         }
         return resultMap
     }
@@ -229,4 +241,10 @@ class EversityPlacer(logger: Logger) {
         return exception
     }
 
+    fun checkIfJobExists(jobID:String):Boolean = _jobGroups.containsKey(jobID) || _jobStatuses.containsKey(jobID)
+
+    fun getGroupJobs(groupJobID:String):List<String>{
+        require(_jobGroups.containsKey(groupJobID)){"Group with ID $groupJobID does not exist"}
+        return _jobGroups[groupJobID]!!
+    }
 }

@@ -55,11 +55,12 @@ dependencies {
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-apache:$ktorVersion")
-    implementation("org.apache.logging.log4j:log4j-api:2.9.1")
-    implementation("org.apache.logging.log4j:log4j-core:2.9.1")
+    implementation("io.ktor:ktor-websockets:$ktorVersion")
+    implementation("org.apache.logging.log4j:log4j-api:2.14.1")
+    implementation("org.apache.logging.log4j:log4j-core:2.14.1")
     implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.14.1")
-    implementation("org.slf4j:slf4j-api:1.7.9")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.2.1")
+    implementation("org.slf4j:slf4j-api:1.7.32")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.2.2")
     //----END OF KTOR DEPENDENCIES
 
     //----DATABASE DEPENDENCIES
@@ -72,7 +73,7 @@ dependencies {
 
     //----OTHER DEPENDENCIES
     implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
-    implementation("com.auth0:java-jwt:3.16.0")
+    implementation("com.auth0:java-jwt:3.18.1")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation("team.yi.ktor:ktor-banner:0.2.0")

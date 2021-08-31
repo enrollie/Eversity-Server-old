@@ -14,13 +14,16 @@ import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.data_functions.fillAbsenceTemplate
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.placer.data_classes.PlaceJob
+import by.enrollie.eversity.placer.data_classes.PlacingStatus
 import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
+import io.ktor.http.cio.websocket.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
+import io.ktor.websocket.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
@@ -46,7 +49,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social)
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
                     return@get call.respondText(
                         text = Json.encodeToString(
                             mapOf(
@@ -71,7 +74,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social)
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
                     return@get call.respondText(
                         text = Json.encodeToString(
                             mapOf(
@@ -121,7 +124,7 @@ fun Route.absenceRoute() {
                 }
                 try {
                     if (user.type == APIUserType.Teacher) {
-                        if (!validateTeacherAccessToClass(user.id, classID))
+                        if (!validateTeacherWriteAccessToClass(user.id, classID))
                             return@post call.respondText(
                                 text = Json.encodeToString(
                                     mapOf(
@@ -187,7 +190,7 @@ fun Route.absenceRoute() {
                 }
                 try {
                     absenceJob.forEach {
-                        if (DateTime.parse(it.date).dayOfWeek == 7){
+                        if (DateTime.parse(it.date).dayOfWeek == 7) {
                             return@post call.respondText(
                                 text = Json.encodeToString(
                                     mapOf(
@@ -419,8 +422,106 @@ fun Route.absenceRoute() {
                         "eversity-data-${SimpleDateFormat("YYYY-MM-dd--HH-mm-ss").format(Calendar.getInstance().time)}.docx"
                     ).toString()
                 )
-                call.respondFile(filledTemplate)
+                call.respondBytes(filledTemplate.readBytes())
                 filledTemplate.deleteOnExit()
+            }
+            webSocket("/subscribe") {
+                var subscribedID: String? = null
+                var isGroupJob = false
+                for (frame in incoming) {
+                    if (subscribedID != null) {
+                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS ALREADY SET"))
+                    }
+                    when (frame) {
+                        is Frame.Text -> {
+                            val receivedID = frame.readText()
+                            if (subscribedID != null) {
+                                send("JOB SUBSCRIPTION IS ALREADY SENT")
+                                continue
+                            }
+                            subscribedID = receivedID.removeSuffix("\n")
+                            if (subscribedID != "all" && !N_Placer.checkIfJobExists(subscribedID)) {
+                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NO SUCH JOB ID WERE FOUND"))
+                                return@webSocket
+                            }
+                            if (subscribedID.startsWith("jb")) {
+                                val doneJob = N_Placer.checkJobStatus(subscribedID)
+                                if (doneJob == PlacingStatus.DONE || doneJob == PlacingStatus.ERROR) {
+                                    send(Json.encodeToString(Pair(subscribedID, doneJob)))
+                                    close(
+                                        CloseReason(
+                                            CloseReason.Codes.NORMAL,
+                                            "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
+                                        )
+                                    )
+                                    return@webSocket
+                                }
+                                if (doneJob == PlacingStatus.RUNNING)
+                                    send(Json.encodeToString(Pair(subscribedID, doneJob)))
+                            } else if (subscribedID.startsWith("gr")) {
+                                isGroupJob = true
+                                val doneJobs = N_Placer.checkJobGroupStatus(subscribedID)
+                                for (job in doneJobs.filter { it.value == PlacingStatus.RUNNING }) {
+                                    send(Json.encodeToString(job.toPair()))
+                                }
+                                for (job in doneJobs.filter { it.value == PlacingStatus.ERROR || it.value == PlacingStatus.DONE }) {
+                                    send(Json.encodeToString(job.toPair()))
+                                }
+                                if (doneJobs.count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == doneJobs.size) {
+                                    close(
+                                        CloseReason(
+                                            CloseReason.Codes.NORMAL,
+                                            "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
+                                        )
+                                    )
+                                }
+                            } else {
+                                if (subscribedID != "all")
+                                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS MALFORMED"))
+                            }
+                            send("subscribed")
+                            val channel = N_Placer.jobsStatusBroadcast.openSubscription()
+                            var received: Pair<String, PlacingStatus>
+                            while (true) {
+                                received = channel.receive()
+                                if (subscribedID == "all") {
+                                    send(Json.encodeToString(received))
+                                    continue
+                                }
+                                if (isGroupJob) {
+                                    val jobsID = N_Placer.getGroupJobs(subscribedID)
+                                    if (jobsID.contains(received.first)) {
+                                        send(Json.encodeToString(received))
+                                    }
+                                    if (N_Placer.checkJobGroupStatus(subscribedID)
+                                            .count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == jobsID.size
+                                    ) {
+                                        close(
+                                            CloseReason(
+                                                CloseReason.Codes.NORMAL,
+                                                "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
+                                            )
+                                        )
+                                        channel.cancel()
+                                        break
+                                    }
+                                } else if (received.first == subscribedID) {
+                                    send(Json.encodeToString(received))
+                                    if (received.second == PlacingStatus.DONE || received.second == PlacingStatus.ERROR) {
+                                        close(
+                                            CloseReason(
+                                                CloseReason.Codes.NORMAL,
+                                                "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
+                                            )
+                                        )
+                                        break
+                                    }
+                                }
+                            }
+                            channel.cancel()
+                        }
+                    }
+                }
             }
         }
     }

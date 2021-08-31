@@ -8,6 +8,7 @@
 package by.enrollie.eversity.routes
 
 import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.security.User
@@ -29,6 +30,7 @@ private data class PupilData(
     val id: Int,
     val firstName: String,
     val lastName: String,
+    val absenceReason: AbsenceReason?,
     val marksList: List<AnonymousMark>
 )
 
@@ -141,32 +143,36 @@ fun Route.diaryRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type == APIUserType.Teacher && !validateTeacherAccessToClass(user.id, classID))
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        "You cannot access this route"
-                    )
-                if (user.type == APIUserType.Parent || user.type == APIUserType.Pupil)
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        "You cannot access this route"
-                    )
                 if (!doesClassExist(classID)) {
                     return@get call.respond(
                         HttpStatusCode.NotFound,
                         "Class with ID $classID was not found"
                     )
                 }
+                if (user.type == APIUserType.Teacher && !validateTeacherAccessToClass(user.id, classID)) {
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        "You cannot access this route"
+                    )
+                }
+                if (user.type == APIUserType.Parent || user.type == APIUserType.Pupil)
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        "You cannot access this route"
+                    )
                 val data = getClassJournal(classID)
                 val timetable = getClassTimetable(classID)
                 val map = mutableMapOf<Pupil, PupilData>()
                 data.first.forEach {
-                    map[it] = PupilData(it.id, it.firstName, it.lastName, listOf())
+                    map[it] = PupilData(it.id, it.firstName, it.lastName, null, listOf())
                 }
                 data.second.forEach {
                     val temp =
-                        (map[it.pupil] ?: PupilData(it.pupil.id, it.pupil.firstName, it.pupil.lastName, listOf()))
-                    map[it.pupil] = temp.copy(marksList = temp.marksList + AnonymousMark(it.markNum, it.lessonPlace))
+                        (map[it.pupil] ?: PupilData(it.pupil.id, it.pupil.firstName, it.pupil.lastName, null, listOf()))
+                    map[it.pupil] = temp.copy(
+                        marksList = temp.marksList + AnonymousMark(it.markNum, it.lessonPlace),
+                        absenceReason = data.third[it.pupil]
+                    )
                 }
                 call.respondText(
                     Json.encodeToString(

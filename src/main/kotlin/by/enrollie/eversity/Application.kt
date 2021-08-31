@@ -32,9 +32,11 @@ import io.ktor.config.*
 import io.ktor.features.*
 import io.ktor.gson.*
 import io.ktor.http.*
+import io.ktor.http.cio.websocket.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.serialization.*
+import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -45,6 +47,7 @@ import org.joda.time.DateTime
 import org.joda.time.Minutes
 import java.io.File
 import java.net.UnknownHostException
+import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -89,8 +92,12 @@ fun main(args: Array<String>): Unit =
 fun Application.module(testing: Boolean = false) {
     install(ContentNegotiation) {
         json()
-        gson {
-        }
+        gson {}
+    }
+    install(WebSockets) {
+        pingPeriod = Duration.ofSeconds(1)
+        timeout = Duration.ofSeconds(15)
+        masking = false
     }
     kotlin.run {
         val props = Properties()
