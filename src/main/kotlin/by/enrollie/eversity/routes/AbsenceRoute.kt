@@ -422,7 +422,7 @@ fun Route.absenceRoute() {
                         "eversity-data-${SimpleDateFormat("YYYY-MM-dd--HH-mm-ss").format(Calendar.getInstance().time)}.docx"
                     ).toString()
                 )
-                call.respondBytes(filledTemplate.readBytes())
+                call.respondFile(filledTemplate)
                 filledTemplate.deleteOnExit()
             }
             webSocket("/subscribe") {

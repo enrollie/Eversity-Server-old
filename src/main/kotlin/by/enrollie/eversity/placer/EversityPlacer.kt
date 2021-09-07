@@ -241,10 +241,10 @@ class EversityPlacer(logger: Logger) {
         return exception
     }
 
-    fun checkIfJobExists(jobID:String):Boolean = _jobGroups.containsKey(jobID) || _jobStatuses.containsKey(jobID)
+    fun checkIfJobExists(jobID: String): Boolean = _jobGroups.containsKey(jobID) || _jobStatuses.containsKey(jobID)
 
-    fun getGroupJobs(groupJobID:String):List<String>{
-        require(_jobGroups.containsKey(groupJobID)){"Group with ID $groupJobID does not exist"}
+    fun getGroupJobs(groupJobID: String): List<String> {
+        require(_jobGroups.containsKey(groupJobID)) { "Group with ID $groupJobID does not exist" }
         return _jobGroups[groupJobID]!!
     }
 }
