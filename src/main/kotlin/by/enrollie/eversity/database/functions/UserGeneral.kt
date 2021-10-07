@@ -164,7 +164,7 @@ fun getUserName(userID: Int, type: APIUserType): Triple<String, String?, String>
             )
             Triple(pupil[Pupils.firstName], null, pupil[Pupils.lastName])
         }
-        APIUserType.Teacher -> {
+        APIUserType.Teacher, APIUserType.Administration -> {
             val cachedTeacher = findCachedTeacher(userID)
             if (cachedTeacher != null)
                 return Triple(
@@ -204,9 +204,6 @@ fun getUserName(userID: Int, type: APIUserType): Triple<String, String?, String>
                 socialTeacher[Teachers.middleName],
                 socialTeacher[Teachers.lastName]
             )
-        }
-        else -> {
-            Triple("", "", "")
         }
     }
 }

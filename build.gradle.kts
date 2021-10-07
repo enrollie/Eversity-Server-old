@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2021.
+ * Author: Pavel Matusevich.
+ * Licensed under GNU AGPLv3.
+ * All rights are reserved.
+ */
+
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.text.SimpleDateFormat
 import java.util.*
@@ -10,7 +17,7 @@ val exposedVersion: String by project
 plugins {
     application
     `maven-publish`
-    kotlin("jvm") version "1.5.0"
+    kotlin("jvm") version "1.5.10"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
     id("com.github.johnrengelman.shadow") version "7.0.0"
     id("org.jetbrains.dokka") version "1.4.32"
@@ -60,7 +67,6 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-core:2.14.1")
     implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.14.1")
     implementation("org.slf4j:slf4j-api:1.7.32")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-properties:1.2.2")
     //----END OF KTOR DEPENDENCIES
 
     //----DATABASE DEPENDENCIES
@@ -73,7 +79,7 @@ dependencies {
 
     //----OTHER DEPENDENCIES
     implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
-    implementation("com.auth0:java-jwt:3.18.1")
+    implementation("com.auth0:java-jwt:3.18.2")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation("team.yi.ktor:ktor-banner:0.2.0")
@@ -106,7 +112,7 @@ compileKotlin.kotlinOptions {
 compileKotlin.dependsOn.add((tasks.getByName("processResources") as ProcessResources).apply {
     filesMatching("appInfo.properties") {
         val props = mutableMapOf<String, String>()
-        props["appVersion"] = getGitVersion()
+        props["appVersion"] = version as String
         val formatter = SimpleDateFormat("YYYY-MM-dd E, HH:mm:ss-SS")
         props["buildDate"] = formatter.format(Calendar.getInstance().time)
         expand(props)

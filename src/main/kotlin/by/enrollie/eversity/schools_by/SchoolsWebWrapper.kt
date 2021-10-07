@@ -679,7 +679,7 @@ open class SchoolsWebWrapper {
 
         }
         if (classID == null)
-            throw UnknownError("Response headers: ${response.headers.toString()}")
+            throw UnknownError("Response headers: ${response.headers}")
         return Pair(classID!!, className)
     }
 

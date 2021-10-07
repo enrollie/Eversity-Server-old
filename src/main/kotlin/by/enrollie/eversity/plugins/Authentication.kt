@@ -11,6 +11,7 @@ import by.enrollie.eversity.database.functions.checkToken
 import by.enrollie.eversity.database.functions.getUserType
 import by.enrollie.eversity.security.EversityJWT
 import by.enrollie.eversity.security.User
+import com.auth0.jwt.exceptions.JWTVerificationException
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.auth.jwt.*
@@ -21,14 +22,30 @@ fun Application.configureAuthentication() {
             verifier(EversityJWT.instance.verifier)
             realm = "Eversity-Core/JWT"
             validate { jwtCredential ->
-                val userID = jwtCredential.payload.getClaim("userID").asString().toInt()
+                val userID = jwtCredential.payload.getClaim("userID").asString().toIntOrNull()
                 val token = jwtCredential.payload.getClaim("token").asString()
-                if (checkToken(userID, token).first) {
+                if (userID != null && checkToken(userID, token).first) {
                     User(userID, getUserType(userID), token)
                 } else {
                     null
                 }
             }
         }
+    }
+}
+
+fun authenticateWithJWT(jwtToken: String): User? {
+    val jwt = try {
+        EversityJWT.instance.verifier.verify(jwtToken)
+    } catch (e: JWTVerificationException) {
+        null
+    } ?: return null
+    val claims = jwt.claims
+    val userID = claims["userID"]?.asString()?.toIntOrNull()
+    val token = claims["token"]?.asString()
+    return if (userID != null && token != null && checkToken(userID, token).first) {
+        User(userID, getUserType(userID), token)
+    } else {
+        null
     }
 }

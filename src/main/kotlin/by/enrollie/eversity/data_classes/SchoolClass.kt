@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class SchoolClass(val id: Int, val title: String, val classTeacherID:Int, val pupils: Array<Pupil>) {
+data class SchoolClass(val id: Int, val title: String, val classTeacherID: Int, val pupils: Array<Pupil>) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -34,3 +34,10 @@ data class SchoolClass(val id: Int, val title: String, val classTeacherID:Int, v
     }
 
 }
+
+@Serializable
+data class LightSchoolClass(
+    val id: Int,
+    val title: String,
+    val isSecondShift: Boolean
+)

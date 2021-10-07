@@ -15,6 +15,7 @@ import by.enrollie.eversity.data_functions.fillAbsenceTemplate
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.placer.data_classes.PlaceJob
 import by.enrollie.eversity.placer.data_classes.PlacingStatus
+import by.enrollie.eversity.plugins.authenticateWithJWT
 import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
@@ -42,6 +43,195 @@ import javax.security.auth.login.CredentialException
 private data class ClassData(val classID: Int, val className: String, val isSecondShift: Boolean)
 
 fun Route.absenceRoute() {
+    route("/wsapi/absence") {
+        webSocket("/statistics/ready") {
+            kotlin.run {
+                var authData = incoming.receive()
+                while (authData !is Frame.Text) {
+                    authData = incoming.receive()
+                }
+                val authToken = authData.readText().replace("\n", "") //Replace added to be used with websocat tool
+                val user = authenticateWithJWT(authToken)
+                    ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NOT AUTHORIZED"))
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
+                    return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "FORBIDDEN"))
+            }
+            send("OK")
+            for (frame in incoming) {
+                when (frame) {
+                    is Frame.Text -> {
+                        when (frame.readText()) {
+                            "BYE", "BYE\n", "bye" -> {
+                                close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
+                            }
+                            "CHECK", "CHECK\n", "READY?", "READY" -> {
+                                val noDataClasses = getNoAbsenceDataClasses()
+                                send(
+                                    Json.encodeToString(
+                                        mapOf(
+                                            "isReady" to Json.encodeToJsonElement(
+                                                noDataClasses.isEmpty()
+                                            ), "noData" to Json.encodeToJsonElement(noDataClasses.map {
+                                                ClassData(it.first, it.second, it.third)
+                                            })
+                                        )
+                                    )
+                                )
+                            }
+                            else -> {
+                                send("BAD CONTENT")
+                            }
+                        }
+                    }
+                    is Frame.Close -> {
+                        close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
+                    }
+                }
+            }
+        }
+        webSocket("/statistics") {
+            kotlin.run {
+                var authData = incoming.receive()
+                while (authData !is Frame.Text) {
+                    authData = incoming.receive()
+                }
+                val authToken =
+                    (authData as Frame.Text).readText().replace("\n", "") //Replace added to be used with websocat tool
+                val user = authenticateWithJWT(authToken)
+                    ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NOT AUTHORIZED"))
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
+                    return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "FORBIDDEN"))
+            }
+            send("OK")
+            for (frame in incoming) {
+                when (frame) {
+                    is Frame.Text -> {
+                        when (frame.readText()) {
+                            "BYE", "BYE\n", "bye" -> {
+                                close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
+                            }
+                            "CHECK", "CHECK\n", "READY?", "READY" -> {
+                                val pupilCount = countPupils()
+                                val absenceStatistics = getAbsenceStatistics()
+                                send(
+                                    Json.encodeToString(
+                                        mapOf(
+                                            "pupilCount" to Json.encodeToJsonElement(pupilCount),
+                                            "absenceStatistics" to Json.encodeToJsonElement(absenceStatistics)
+                                        )
+                                    )
+                                )
+                            }
+                            else -> {
+                                send("BAD CONTENT")
+                            }
+                        }
+                    }
+                    is Frame.Close -> {
+                        close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
+                    }
+                }
+            }
+        }
+        webSocket("/subscribe/jobs") {
+            var subscribedID: String? = null
+            var isGroupJob = false
+            for (frame in incoming) {
+                if (subscribedID != null) {
+                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS ALREADY SET"))
+                }
+                when (frame) {
+                    is Frame.Text -> {
+                        val receivedID = frame.readText()
+                        if (subscribedID != null) {
+                            send("JOB SUBSCRIPTION IS ALREADY SENT")
+                            continue
+                        }
+                        subscribedID = receivedID.removeSuffix("\n")
+                        if (subscribedID != "all" && !N_Placer.checkIfJobExists(subscribedID)) {
+                            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NO SUCH JOB ID WERE FOUND"))
+                            return@webSocket
+                        }
+                        if (subscribedID.startsWith("jb")) {
+                            val doneJob = N_Placer.checkJobStatus(subscribedID)
+                            if (doneJob == PlacingStatus.DONE || doneJob == PlacingStatus.ERROR) {
+                                send(Json.encodeToString(Pair(subscribedID, doneJob)))
+                                close(
+                                    CloseReason(
+                                        CloseReason.Codes.NORMAL,
+                                        "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
+                                    )
+                                )
+                                return@webSocket
+                            }
+                            if (doneJob == PlacingStatus.RUNNING)
+                                send(Json.encodeToString(Pair(subscribedID, doneJob)))
+                        } else if (subscribedID.startsWith("gr")) {
+                            isGroupJob = true
+                            val doneJobs = N_Placer.checkJobGroupStatus(subscribedID)
+                            for (job in doneJobs.filter { it.value == PlacingStatus.RUNNING }) {
+                                send(Json.encodeToString(job.toPair()))
+                            }
+                            for (job in doneJobs.filter { it.value == PlacingStatus.ERROR || it.value == PlacingStatus.DONE }) {
+                                send(Json.encodeToString(job.toPair()))
+                            }
+                            if (doneJobs.count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == doneJobs.size) {
+                                close(
+                                    CloseReason(
+                                        CloseReason.Codes.NORMAL,
+                                        "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
+                                    )
+                                )
+                            }
+                        } else {
+                            if (subscribedID != "all")
+                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS MALFORMED"))
+                        }
+                        send("OK")
+                        val channel = N_Placer.jobsStatusBroadcast.openSubscription()
+                        var received: Pair<String, PlacingStatus>
+                        while (true) {
+                            received = channel.receive()
+                            if (subscribedID == "all") {
+                                send(Json.encodeToString(received))
+                                continue
+                            }
+                            if (isGroupJob) {
+                                val jobsID = N_Placer.getGroupJobs(subscribedID)
+                                if (jobsID.contains(received.first)) {
+                                    send(Json.encodeToString(received))
+                                }
+                                if (N_Placer.checkJobGroupStatus(subscribedID)
+                                        .count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == jobsID.size
+                                ) {
+                                    close(
+                                        CloseReason(
+                                            CloseReason.Codes.NORMAL,
+                                            "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
+                                        )
+                                    )
+                                    channel.cancel()
+                                    break
+                                }
+                            } else if (received.first == subscribedID) {
+                                send(Json.encodeToString(received))
+                                if (received.second == PlacingStatus.DONE || received.second == PlacingStatus.ERROR) {
+                                    close(
+                                        CloseReason(
+                                            CloseReason.Codes.NORMAL,
+                                            "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
+                                        )
+                                    )
+                                    break
+                                }
+                            }
+                        }
+                        channel.cancel()
+                    }
+                }
+            }
+        }
+    }
     authenticate("jwt") {
         route("/api/absence") {
             get("/statistics") {
@@ -119,7 +309,7 @@ fun Route.absenceRoute() {
                                 "errorCode" to "ACTION_IS_UNAUTHORIZED",
                                 "action" to "NOTHING"
                             )
-                        ), status = HttpStatusCode.BadRequest
+                        ), status = HttpStatusCode.Forbidden
                     )
                 }
                 try {
@@ -131,7 +321,7 @@ fun Route.absenceRoute() {
                                         "errorCode" to "UNAUTHORIZED_ACTION",
                                         "action" to "NOTHING"
                                     )
-                                ), status = HttpStatusCode.BadRequest
+                                ), status = HttpStatusCode.Forbidden
                             )
                     }
                 } catch (e: IllegalArgumentException) {
@@ -324,7 +514,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social) {
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -332,7 +522,7 @@ fun Route.absenceRoute() {
                                 "errorCode" to "ACTION_IS_UNAUTHORIZED",
                                 "action" to "NOTHING"
                             )
-                        ), status = HttpStatusCode.BadRequest
+                        ), status = HttpStatusCode.Forbidden
                     )
                 }
                 val noDataClasses = getNoAbsenceDataClasses()
@@ -353,7 +543,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social) {
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -361,7 +551,7 @@ fun Route.absenceRoute() {
                                 "errorCode" to "ACTION_IS_UNAUTHORIZED",
                                 "action" to "NOTHING"
                             )
-                        ), status = HttpStatusCode.BadRequest
+                        ), status = HttpStatusCode.Forbidden
                     )
                 }
                 val absenceData = getAbsenceStatistics()
@@ -396,7 +586,7 @@ fun Route.absenceRoute() {
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText(text = "Malformed date. Reminder: required date format: YYYY-MM-dd")
                 }
-                if (user.type != APIUserType.Social) {
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -404,7 +594,7 @@ fun Route.absenceRoute() {
                                 "errorCode" to "ACTION_IS_UNAUTHORIZED",
                                 "action" to "NOTHING"
                             )
-                        ), status = HttpStatusCode.BadRequest
+                        ), status = HttpStatusCode.Forbidden
                     )
                 }
                 val absences = getAbsenceStatistics(date)
@@ -425,103 +615,24 @@ fun Route.absenceRoute() {
                 call.respondFile(filledTemplate)
                 filledTemplate.deleteOnExit()
             }
-            webSocket("/subscribe") {
-                var subscribedID: String? = null
-                var isGroupJob = false
-                for (frame in incoming) {
-                    if (subscribedID != null) {
-                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS ALREADY SET"))
-                    }
-                    when (frame) {
-                        is Frame.Text -> {
-                            val receivedID = frame.readText()
-                            if (subscribedID != null) {
-                                send("JOB SUBSCRIPTION IS ALREADY SENT")
-                                continue
-                            }
-                            subscribedID = receivedID.removeSuffix("\n")
-                            if (subscribedID != "all" && !N_Placer.checkIfJobExists(subscribedID)) {
-                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NO SUCH JOB ID WERE FOUND"))
-                                return@webSocket
-                            }
-                            if (subscribedID.startsWith("jb")) {
-                                val doneJob = N_Placer.checkJobStatus(subscribedID)
-                                if (doneJob == PlacingStatus.DONE || doneJob == PlacingStatus.ERROR) {
-                                    send(Json.encodeToString(Pair(subscribedID, doneJob)))
-                                    close(
-                                        CloseReason(
-                                            CloseReason.Codes.NORMAL,
-                                            "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
-                                        )
-                                    )
-                                    return@webSocket
-                                }
-                                if (doneJob == PlacingStatus.RUNNING)
-                                    send(Json.encodeToString(Pair(subscribedID, doneJob)))
-                            } else if (subscribedID.startsWith("gr")) {
-                                isGroupJob = true
-                                val doneJobs = N_Placer.checkJobGroupStatus(subscribedID)
-                                for (job in doneJobs.filter { it.value == PlacingStatus.RUNNING }) {
-                                    send(Json.encodeToString(job.toPair()))
-                                }
-                                for (job in doneJobs.filter { it.value == PlacingStatus.ERROR || it.value == PlacingStatus.DONE }) {
-                                    send(Json.encodeToString(job.toPair()))
-                                }
-                                if (doneJobs.count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == doneJobs.size) {
-                                    close(
-                                        CloseReason(
-                                            CloseReason.Codes.NORMAL,
-                                            "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
-                                        )
-                                    )
-                                }
-                            } else {
-                                if (subscribedID != "all")
-                                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS MALFORMED"))
-                            }
-                            send("subscribed")
-                            val channel = N_Placer.jobsStatusBroadcast.openSubscription()
-                            var received: Pair<String, PlacingStatus>
-                            while (true) {
-                                received = channel.receive()
-                                if (subscribedID == "all") {
-                                    send(Json.encodeToString(received))
-                                    continue
-                                }
-                                if (isGroupJob) {
-                                    val jobsID = N_Placer.getGroupJobs(subscribedID)
-                                    if (jobsID.contains(received.first)) {
-                                        send(Json.encodeToString(received))
-                                    }
-                                    if (N_Placer.checkJobGroupStatus(subscribedID)
-                                            .count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == jobsID.size
-                                    ) {
-                                        close(
-                                            CloseReason(
-                                                CloseReason.Codes.NORMAL,
-                                                "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
-                                            )
-                                        )
-                                        channel.cancel()
-                                        break
-                                    }
-                                } else if (received.first == subscribedID) {
-                                    send(Json.encodeToString(received))
-                                    if (received.second == PlacingStatus.DONE || received.second == PlacingStatus.ERROR) {
-                                        close(
-                                            CloseReason(
-                                                CloseReason.Codes.NORMAL,
-                                                "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
-                                            )
-                                        )
-                                        break
-                                    }
-                                }
-                            }
-                            channel.cancel()
-                        }
-                    }
+            get("/statistics/perClass") {
+                val user = call.authentication.principal<User>() ?: return@get call.respond(
+                    HttpStatusCode.Unauthorized,
+                    "Authentication failed. Check your token."
+                )
+                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
+                    this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
+                    return@get call.respondText(
+                        text = Json.encodeToString(
+                            mapOf(
+                                "errorCode" to "ACTION_IS_UNAUTHORIZED",
+                                "action" to "NOTHING"
+                            )
+                        ), status = HttpStatusCode.Forbidden
+                    )
                 }
+                val data = getSchoolStatistics()
+                return@get call.respond(Json.encodeToString(data))
             }
         }
     }

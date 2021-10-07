@@ -7,9 +7,7 @@
 
 package by.enrollie.eversity.database.functions
 
-import by.enrollie.eversity.data_classes.Absence
-import by.enrollie.eversity.data_classes.AbsenceReason
-import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.tables.Absences
 import by.enrollie.eversity.database.tables.Classes
 import kotlinx.serialization.decodeFromString
@@ -203,4 +201,35 @@ fun getNoAbsenceDataClasses(date: DateTime = DateTime.now()): List<Triple<Int, S
     }
     val noDataClasses = isClassPresent.filter { !it.value }.map { it.key }
     return classesList.filter { noDataClasses.contains(it.first) }
+}
+
+fun getSchoolStatistics(date: DateTime = DateTime.now()): List<Pair<LightSchoolClass, AbsenceStatisticsPackage>> {
+    val (absenceData, classesList) = transaction {
+        Pair(Absences.select {
+            Absences.date eq date
+        }.toList().map {
+            Absence(
+                it[Absences.pupilID] ?: -1,
+                it[Absences.classID],
+                it[Absences.date].toString("YYYY-MM-dd"),
+                AbsenceReason.valueOf(it[Absences.reason]),
+                Json.decodeFromString(it[Absences.absenceList])
+            )
+        }.toSet(),
+            Classes.selectAll().toList()
+                .map { LightSchoolClass(it[Classes.classID], it[Classes.name], it[Classes.isSecondShift]) }
+        )
+    }
+    val dataList = mutableListOf<Pair<LightSchoolClass, AbsenceStatisticsPackage>>()
+    for (schoolClass in classesList) {
+        val classAbsenceData = absenceData.filter { it.classID == schoolClass.id && it.pupilID != -1 }
+        dataList += Pair(schoolClass, AbsenceStatisticsPackage(
+            classAbsenceData.count { it.reason == AbsenceReason.ILLNESS },
+            classAbsenceData.count { it.reason == AbsenceReason.HEALING },
+            classAbsenceData.count { it.reason == AbsenceReason.REQUEST },
+            classAbsenceData.count { it.reason == AbsenceReason.COMPETITION },
+            classAbsenceData.count { it.reason == AbsenceReason.UNKNOWN }
+        ))
+    }
+    return dataList
 }

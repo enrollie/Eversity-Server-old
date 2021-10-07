@@ -30,7 +30,7 @@ fun getTeacherTimetable(userID: Int): Pair<Map<DayOfWeek, Array<TeacherLesson>>?
     if (!doesUserExist(userID)) {
         throw UserNotRegistered("User with ID $userID does not exist")
     }
-    if (getUserType(userID) != APIUserType.Teacher)
+    if (getUserType(userID) != APIUserType.Teacher && getUserType(userID) != APIUserType.Administration)
         throw IllegalArgumentException("User with ID $userID is not a Teacher (they are ${getUserType(userID).name}, in fact)")
     val timetable = transaction {
         TeachersTimetable.select {
