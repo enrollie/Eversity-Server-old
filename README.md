@@ -8,11 +8,11 @@ Core of Eversity project. Developed for self-hosting at school site. Uses "Schoo
 
 ### Requirements:
 
-- Windows XP or later (or any Windows, that supports JRE (Java) 8 or later), or any Linux distributive, that supports JRE 8 (developer uses Ubuntu Server 18.04 for testing)
+- Windows 7 or later (or any Windows, that supports JRE (Java) 11 or later), or any Linux distribution, that supports JRE 11 (developer uses Ubuntu Server 21.04 for testing)
 
-- At least 1 GB of RAM on server
+- At least 1.5 GB of RAM on server
 
-- JRE 8 (Java 8)
+- JRE 11 (Java 11)
 
 - School, connected to "Schools.by" system
 
@@ -20,21 +20,18 @@ Core of Eversity project. Developed for self-hosting at school site. Uses "Schoo
 
 - School-wide Local Area Network
 
-**Installation guide is written for Windows Server 2003, but for every other OS installation is roughly same. (except for Linux, but I think, that if you have Linux, you know how to install all of it)**
+*Author of README did all of those steps on Ubuntu Server 21.04 machine*
 
 1. ##### Install Java Runtime.
-   
-   **Warning: Java 8 is considered unreliable for usage on Windows Server 2003, so no one is responsible for Eversity not running well on this** *(actually, no one is responsible for anything in this repository)*
-   
-   Latest JRE, that author tested to be installable on Windows Server 2003 was jre-8u121, so we will use it for our guide (but you are free to do anything, just install JRE or JDK 8 or later). Search the Oracle archives (because this is the only reliable and trust-worthy place to download this) for JRE 8u121. Download and install as regular program. The only thing that you need to do is to add Java home to %PATH% environment variable. Please, search internet for how-to.
+   Refer to the Internet on how to install a Java Runtime. Remember, you need JRE 11 or later.
 
 2. ##### Install PostgreSQL
    
-   PostgreSQL v9.3.2 seems to install just fine on Windows Server 2003, so go to PostgreSQL official website and download installer, and install it. Then run pgAdmin, connect to your newly installed server with password you set at install time. Create new role with any username you want. As we are in simple guide, let's create role named "eversity" with password "very-strong-password" *(please, **do not** use this kind of passwords in production)*. Then create database with any name (for convenience you can name it "eversity") That's all we have to do with Postgres.
+   Please, refer to the Internet on how to install PostgreSQL on your OS. Then create user (in example - "eversity"). As we are in simple guide, let's create role named "eversity" with password "very-strong-password" *(please, **do not** use this kind of passwords in production)*. Then create database with any name (for convenience you can name it "eversity") That's all we have to do with Postgres.
 
 3. ##### Download Eversity Server
    
-   If you are reading this on GitHub, there is "Packages" section on your right (or left, if you are Arabian) with "by.enrollie.eversity..." in it. Click it, then download "eversity-server-...-uberJar.jar" (it usually comes first). Download it to secure directory, as in the same directory database access data will be stored. (tips on security: do not set guessable passwords, do not let any unauthorized persons to interact with those folders, do not share these folders (actual for school-local servers)). Rename downloaded file to "**Eversity-Server.jar**" (for convenience in step 5) 
+   If you are reading this on GitHub, there is "Packages" section on your right (or left, if you are Arabian) with "by.enrollie.eversity..." in it. Click it, then download "eversity-server-...-uberJar.jar" (it usually comes first). Download it to secure directory, as in the same directory database access data will be stored. (tips on security: do not set guessable passwords, do not let any unauthorized persons to interact with those folders, do not share these folders). Rename downloaded file to "**Eversity-Server.jar**" (for convenience in step 5) 
 
 4. ##### Setup Eversity Server
    
@@ -42,7 +39,7 @@ Core of Eversity project. Developed for self-hosting at school site. Uses "Schoo
    
    Now,  rename "school_naming.properties.template" to "**school_naming.properties**" (remove ".template"). Open it and fill in all of school names. Now, open "application.conf" and fill in all of data here (don't worry, it's all commented).
    
-    _Note about Telegram bot token: please, search for internet for how-to create it_
+    _Note about Telegram bot token: please, search for internet on how-to create it_
    
    _Note about school website: it is also used for Telegram bot, but, since most likely your server is behind NAT, you can fill it with any website (preferably, related to your school)_
 
@@ -50,7 +47,7 @@ Core of Eversity project. Developed for self-hosting at school site. Uses "Schoo
    
    Create file "run.bat" (or similar) in same directory, as Eversity Server JAR. Put in the following text: 
    
-   ```powershell
+   ```bash
    java -jar Eversity-Server.jar -config=application.conf
    ```
    
@@ -58,7 +55,7 @@ Core of Eversity project. Developed for self-hosting at school site. Uses "Schoo
 
 6. ##### Use it!
    
-   Set up web client and ask all of your teachers (especially class teachers, as they are main data sources) and ask them not to place any absences until all of class teachers login (you can see it by count of registered classes in database). 
+   Set up any client you want (refer to one's Installation Guides) and use Eversity. Official client is Eversity Client (at the time of writing, still under development)
 
 # Building
 
