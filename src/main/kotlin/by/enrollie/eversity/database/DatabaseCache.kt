@@ -92,7 +92,7 @@ fun cacheTeacher(teacher: Teacher, classID: Int?) {
  * Adds [credentials] to cache and replaces (if any) already cached ones
  */
 fun cacheCredentials(userID: Int, credentials: Pair<Pair<String?, String?>, String>) {
-    invalidateCredentials(userID)
+    invalidateCredentialsCache(userID)
     credentialsCacheSet.add(Triple(userID, credentials.first, credentials.second))
 }
 
@@ -117,4 +117,4 @@ fun cacheClass(schoolClass: SchoolClass){
 /**
  * Invalidates credentials of user with [userID]
  */
-fun invalidateCredentials(userID: Int) = credentialsCacheSet.removeIf { it.first == userID }
+fun invalidateCredentialsCache(userID: Int) = credentialsCacheSet.removeIf { it.first == userID }

@@ -218,3 +218,11 @@ fun getAllCredentials(): List<Pair<Int, Triple<String?, String?, String>>> {
         }
     }
 }
+
+fun removeCredentials(userID: Int) {
+    transaction {
+        Credentials.deleteWhere {
+            Credentials.id eq userID
+        }
+    }
+}

@@ -10,6 +10,7 @@ package by.enrollie.eversity.schools_by
 import by.enrollie.eversity.N_Placer
 import by.enrollie.eversity.database.functions.getAllCredentials
 import by.enrollie.eversity.database.functions.invalidateAllTokens
+import by.enrollie.eversity.database.functions.removeCredentials
 import by.enrollie.eversity.launchPeriodicAsync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,7 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
                     false
                 }
                 if (!result) {
+                    removeCredentials(checkingCredentials.first)
                     if (invalidateAllTokens(checkingCredentials.first, "AUTO_COOKIES_NOT_VALID") != 0) {
                         logger.info("Invalidated tokens for user ID ${checkingCredentials.first} because auto-check failed for Schools.by credentials")
                         invalidatedCounter++
