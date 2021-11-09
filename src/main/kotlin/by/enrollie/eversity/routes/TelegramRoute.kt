@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.joda.time.DateTime
@@ -32,6 +33,8 @@ import kotlin.random.Random
 val telegramPairingCodesList = mutableListOf<Pair<Short, Triple<Int, List<Int>, DateTime>>>()
 
 private val random = Random("Eversity".hashCode())
+
+@OptIn(ExperimentalSerializationApi::class)
 fun Route.telegramRoute() {
     authenticate("jwt") {
         route("/api/telegram") {
@@ -85,7 +88,12 @@ fun Route.telegramRoute() {
 
                 val pupilsList = try {
                     val creds = obtainCredentials(userJWT.id)
-                    SchoolsWebWrapper(Pair(creds.first.toString(), creds.second.toString())).fetchParentPupils(userJWT.id)
+                    SchoolsWebWrapper(
+                        Pair(
+                            creds.first.toString(),
+                            creds.second.toString()
+                        )
+                    ).singleUse { fetchParentPupils(userJWT.id) }
                 } catch (e: UnknownError) {
                     return@get call.respondText(
                         status = HttpStatusCode.FailedDependency,

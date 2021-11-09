@@ -28,7 +28,7 @@ import org.slf4j.Logger
 
 
 /**
- * A wrapper for parsing and making data out of Schools.by HTML pages
+ * A library for parsing and making data out of Schools.by HTML pages
  * @author Pavel Matusevich
  */
 open class SchoolsWebWrapper {
@@ -49,7 +49,10 @@ open class SchoolsWebWrapper {
     var authenticatedUserID: Int? = null
         private set
 
-    protected val logger: Logger = org.slf4j.LoggerFactory.getLogger("Schools.by")
+    private val logger: Logger = org.slf4j.LoggerFactory.getLogger("Schools.by")
+
+    private var isClientReady: Boolean = true
+    private var lastStackTrace: Array<java.lang.StackTraceElement> = arrayOf()
 
     protected var client = HttpClient {
         followRedirects = true
@@ -59,10 +62,11 @@ open class SchoolsWebWrapper {
             cookie("sessionid", schoolsBYCookies.second)
             userAgent(userAgent)
             timeout {
-                this.connectTimeoutMillis = 1000
-                this.requestTimeoutMillis = 1000
-                this.socketTimeoutMillis = 2000
+                connectTimeoutMillis = 1000
+                requestTimeoutMillis = 1000
+                socketTimeoutMillis = 2000
             }
+            lastStackTrace = Exception().stackTrace
         }
     }
 
@@ -131,7 +135,7 @@ open class SchoolsWebWrapper {
     suspend fun login(username: String, password: String): Pair<String, String> {
         val baseCSRFresponse = HttpClient().use {
             it.get<HttpResponse>("https://schools.by/login") {
-                headers.append(HttpHeaders.UserAgent, userAgent)
+                header(HttpHeaders.UserAgent, userAgent)
                 userAgent(userAgent)
             }
         }
@@ -171,6 +175,12 @@ open class SchoolsWebWrapper {
             defaultRequest {
                 cookie("csrftoken", schoolsBYCookies.first)
                 cookie("sessionid", schoolsBYCookies.second)
+                userAgent(userAgent)
+                timeout {
+                    connectTimeoutMillis = 1000
+                    requestTimeoutMillis = 1000
+                    socketTimeoutMillis = 2000
+                }
             }
         }
         userType = when {
@@ -204,6 +214,7 @@ open class SchoolsWebWrapper {
      * @return true if cookies are valid, false otherwise
      */
     suspend fun validateCookies(cookies: Pair<String, String>? = null, changeInternal: Boolean = true): Boolean {
+        lastStackTrace = Exception().stackTrace
         val response = HttpClient().use {
             it.request<HttpResponse> {
                 url.takeFrom(subdomainURL)
@@ -250,6 +261,7 @@ open class SchoolsWebWrapper {
      * @throws IllegalArgumentException Thrown, if no pupils found.
      */
     suspend fun fetchPupilsArray(classID: Int): Array<Pupil> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}class/$classID/pupils")
             method = HttpMethod.Get
@@ -295,6 +307,7 @@ open class SchoolsWebWrapper {
      * @throws IllegalArgumentException Thrown, if no class teacher is not found.
      */
     suspend fun fetchClassForTeacher(classID: Int): Int {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("$subdomainURL/class/$classID")
             method = HttpMethod.Get
@@ -333,6 +346,7 @@ open class SchoolsWebWrapper {
      * @throws NotFoundException Thrown, if Schools.by returned 404 code (usually, class ID is invalid)
      */
     suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("$subdomainURL/class/$classID/timetable")
             method = HttpMethod.Get
@@ -425,6 +439,7 @@ open class SchoolsWebWrapper {
      * @return Class ID, if present, else null
      */
     suspend fun fetchClassForCurrentUser(): Pair<Int, String>? {
+        lastStackTrace = Exception().stackTrace
         val response = HttpClient {
             followRedirects = true
         }.use {
@@ -474,6 +489,7 @@ open class SchoolsWebWrapper {
      * @throws IllegalArgumentException Thrown, if
      */
     suspend fun fetchTeacherTimetable(userID: Int): Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}teacher/$userID/timetable")
             method = HttpMethod.Get
@@ -573,6 +589,7 @@ open class SchoolsWebWrapper {
     }
 
     suspend fun fetchParentPupils(parentID: Int): List<Pupil> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}parent/$parentID")
             method = HttpMethod.Get
@@ -591,7 +608,7 @@ open class SchoolsWebWrapper {
                     findAll {
                         for (list in this) {
                             if (try {
-                                    list.table { findFirst {  }}
+                                    list.table { findFirst { } }
                                     false
                                 } catch (e: ElementNotFoundException) {
                                     true
@@ -647,6 +664,7 @@ open class SchoolsWebWrapper {
     }
 
     suspend fun getPupilClass(pupilID: Int): Pair<Int, String> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}pupil/$pupilID")
             method = HttpMethod.Get
@@ -684,6 +702,7 @@ open class SchoolsWebWrapper {
     }
 
     suspend fun getUserName(userID: Int): Pair<String, String> {
+        lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
             url.takeFrom("${subdomainURL}user/$userID")
             method = HttpMethod.Get
@@ -714,5 +733,36 @@ open class SchoolsWebWrapper {
             Pair(split[1], split.first())
         }
         return returnData
+    }
+
+    /**
+     * Allows usage of library without storing it.
+     * Useful when it's only used once (i.e. checking cookies)
+     * @param action Action to do
+     */
+    suspend fun <T> singleUse(action: suspend SchoolsWebWrapper.() -> T): T {
+        val result = try {
+            action()
+        } catch (e: Exception) {
+            destroy()
+            throw e
+        }
+        destroy()
+        return result
+    }
+
+    /**
+     * Closes Ktor client for correct
+     */
+    fun destroy() {
+        client.close()
+        isClientReady = false
+    }
+
+    protected fun finalize() {
+        if (isClientReady) {
+            logger.error("Client is not closed on finalize!")
+            logger.error("Stack trace: ${lastStackTrace.take(5).joinToString(separator = ";\n") { it.toString() }}")
+        }
     }
 }

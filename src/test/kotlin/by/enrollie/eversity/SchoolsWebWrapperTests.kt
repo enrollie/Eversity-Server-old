@@ -16,6 +16,7 @@ import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -84,7 +85,7 @@ class SchoolsWebWrapperTests {
     @Test
     fun testClassTeacherParser() {
         runBlocking {
-            val response = SchoolsWebWrapper(client).fetchClassForTeacher(2)
+            val response = SchoolsWebWrapper(client).singleUse { fetchClassForTeacher(2) }
             assertEquals(652900, response)
         }
     }
@@ -97,7 +98,7 @@ class SchoolsWebWrapperTests {
                 throw IllegalArgumentException("Valid result for class timetable is not found (path: \"${validResponseFile.absolutePath}\")")
             }
             val validMap = Json.decodeFromString<Map<DayOfWeek, Array<Lesson>>>(String(validResponseFile.readBytes()))
-            val responseMap = SchoolsWebWrapper(client).fetchClassTimetable(1)
+            val responseMap = SchoolsWebWrapper(client).singleUse { fetchClassTimetable(1) }
             assertEquals(
                 Json.encodeToJsonElement(validMap),
                 Json.encodeToJsonElement(responseMap),
@@ -106,6 +107,7 @@ class SchoolsWebWrapperTests {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testTeacherTimetableParser() {
         runBlocking {
@@ -113,7 +115,7 @@ class SchoolsWebWrapperTests {
             if (!validResponseFile.exists()) {
                 throw IllegalArgumentException("Valid result for teacher timetable is not found (path: \"${validResponseFile.absolutePath}\")")
             }
-            val responseMap = SchoolsWebWrapper(client).fetchTeacherTimetable(1)
+            val responseMap = SchoolsWebWrapper(client).singleUse { fetchTeacherTimetable(1) }
 
             val validMap =
                 Json.decodeFromString<Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?>>(
@@ -124,6 +126,7 @@ class SchoolsWebWrapperTests {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testTeacherTimetableParserBothShifts() {
         runBlocking {
@@ -135,13 +138,14 @@ class SchoolsWebWrapperTests {
                 Json.decodeFromString<Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?>>(
                     String(validResponseFile.readBytes())
                 )
-            val responseMap = SchoolsWebWrapper(client).fetchTeacherTimetable(2)
+            val responseMap = SchoolsWebWrapper(client).singleUse { fetchTeacherTimetable(2) }
             assertEquals(Json.encodeToString(validMap.first), Json.encodeToString(responseMap.first))
             assertEquals(Json.encodeToString(validMap.second), Json.encodeToString(validMap.second))
             assertNotNull(validMap.second)
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun testPupilListParser() {
         runBlocking {
@@ -150,7 +154,7 @@ class SchoolsWebWrapperTests {
                 throw IllegalArgumentException("Valid result for pupils list is not found (path: \"${validResponseFile.absolutePath}\")")
             }
             val validMap = Json.decodeFromString<Array<Pupil>>(String(validResponseFile.readBytes()))
-            val responseMap = SchoolsWebWrapper(client).fetchPupilsArray(3)
+            val responseMap = SchoolsWebWrapper(client).singleUse { fetchPupilsArray(3) }
             assertEquals(Json.encodeToString(validMap), Json.encodeToString(responseMap))
         }
     }

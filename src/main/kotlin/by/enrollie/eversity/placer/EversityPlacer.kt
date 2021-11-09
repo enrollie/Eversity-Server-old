@@ -27,6 +27,7 @@ import javax.security.auth.login.CredentialException
  * Engine for putting absence data to Schools.by and Eversity database
  * @author Pavel Matusevich, a.k.a. Neitex
  */
+@OptIn(ObsoleteCoroutinesApi::class)
 class EversityPlacer(logger: Logger) {
 
     private var _schoolsByAvailable = true
@@ -106,7 +107,7 @@ class EversityPlacer(logger: Logger) {
      * @throws CredentialException Thrown, if given credentials are invalid
      */
     suspend fun addPlacementJob(job: PlaceJob): String {
-        if (_schoolsByAvailable && !SchoolsWebWrapper().validateCookies(job.credentials.first)) {
+        if (_schoolsByAvailable && !SchoolsWebWrapper().singleUse { validateCookies(job.credentials.first) }) {
             log.debug("Credentials of added job are invalid")
             throw CredentialException("Credentials for job are invalid")
         } else if (!_schoolsByAvailable) {
@@ -131,7 +132,7 @@ class EversityPlacer(logger: Logger) {
      */
     suspend fun batchPlacementJobs(jobList: List<PlaceJob>): String {
         require(jobList.count { it.credentials == jobList.first().credentials } == jobList.size) { "Job list credentials are not the same" }
-        if (!SchoolsWebWrapper().validateCookies(jobList.first().credentials.first)) {
+        if (!SchoolsWebWrapper().singleUse { validateCookies(jobList.first().credentials.first) }) {
             log.debug("Credentials of added job are invalid")
             throw CredentialException("Credentials for job are invalid")
         }

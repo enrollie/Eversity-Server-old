@@ -56,12 +56,14 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
                     continue
                 }
                 val result = try {
-                    SchoolsWebWrapper().validateCookies(
-                        Pair(
-                            checkingCredentials.second.first!!,
-                            checkingCredentials.second.second!!
+                    SchoolsWebWrapper().singleUse {
+                        validateCookies(
+                            Pair(
+                                checkingCredentials.second.first!!,
+                                checkingCredentials.second.second!!
+                            )
                         )
-                    )
+                    }
                 } catch (e: AuthenticationException) {
                     false
                 } catch (e: UnknownError) {

@@ -30,6 +30,7 @@ class DataController {
                 val credentials = try {
                     obtainCredentials(user.id)
                 } catch (e: NoSuchElementException) {
+                    wrapper.destroy()
                     //TODO: Add finding of appropriate credentials in other user's
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
@@ -38,16 +39,19 @@ class DataController {
                     changeInternal = true
                 )
                 if (!validity) {
+                    wrapper.destroy()
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
                 val classID = getPupilClass(user.id)
                 val classTimetable = wrapper.fetchClassTimetable(classID)
+                wrapper.destroy()
                 registerClassTimetable(classID, classTimetable)
             }
             APIUserType.Teacher -> {
                 val credentials = try {
                     obtainCredentials(user.id)
                 } catch (e: NoSuchElementException) {
+                    wrapper.destroy()
                     //TODO: Add finding of appropriate credentials in other user's
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
@@ -56,10 +60,12 @@ class DataController {
                     changeInternal = true
                 )
                 if (!validity) {
+                    wrapper.destroy()
                     throw IllegalStateException("Cookies are invalid. Re-login required to update data.")
                 }
                 val timetable = wrapper.fetchTeacherTimetable(user.id)
                 registerTeacherTimetable(user.id, timetable)
+                wrapper.destroy()
             }
             else -> {
                 return

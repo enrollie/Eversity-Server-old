@@ -17,10 +17,9 @@ val exposedVersion: String by project
 plugins {
     application
     `maven-publish`
-    kotlin("jvm") version "1.5.10"
+    kotlin("jvm") version "1.5.31"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
     id("com.github.johnrengelman.shadow") version "7.0.0"
-    id("org.jetbrains.dokka") version "1.4.32"
 }
 
 group = "by.enrollie.eversity"
@@ -74,7 +73,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jodatime:$exposedVersion")
-    implementation("org.postgresql:postgresql:42.2.2")
+    implementation("org.postgresql:postgresql:42.3.1")
     //----END OF DATABASE DEPENDENCIES
 
     //----OTHER DEPENDENCIES

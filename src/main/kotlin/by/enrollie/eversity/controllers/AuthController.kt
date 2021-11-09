@@ -41,8 +41,13 @@ class AuthController {
     suspend fun registerUser(username: String, password: String): String {
         val schoolsWeb = SchoolsWebWrapper()
         val credentials = schoolsWeb.login(username, password)
-        val userID = schoolsWeb.authenticatedUserID ?: throw AuthorizationUnsuccessful()
+        val userID = schoolsWeb.authenticatedUserID
+        if (userID == null) {
+            schoolsWeb.destroy()
+            throw AuthorizationUnsuccessful()
+        }
         if (doesUserExist(userID)) {
+            schoolsWeb.destroy()
             return loginUser(username, password)
         }
         when (schoolsWeb.userType) {
@@ -52,6 +57,7 @@ class AuthController {
                     try {
                         registrar.registerClass(classID, className, schoolsWeb)
                     } catch (e: IllegalArgumentException) {
+                        schoolsWeb.destroy()
                         logger.error(e)
                         throw UnknownError("Schools web wrapper has invalid cookies")
                     }
@@ -65,6 +71,7 @@ class AuthController {
                     userID,
                     Triple(credentials.first, credentials.second, "")
                 )
+                schoolsWeb.destroy()
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
@@ -98,12 +105,14 @@ class AuthController {
                     )
                 }
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
+                schoolsWeb.destroy()
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
             APIUserType.Parent -> {
                 registerParent(userID)
                 insertOrUpdateCredentials(userID, Triple(credentials.first, credentials.second, ""))
+                schoolsWeb.destroy()
                 val eversityToken = issueToken(userID)
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
@@ -121,9 +130,11 @@ class AuthController {
                 )
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
                 val eversityToken = issueToken(userID)
+                schoolsWeb.destroy()
                 return EversityJWT.instance.sign(userID.toString(), eversityToken)
             }
             else -> {
+                schoolsWeb.destroy()
                 logger.error("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
                 throw UnknownError("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
             }
@@ -138,8 +149,13 @@ class AuthController {
         }
         val schoolsWeb = SchoolsWebWrapper()
         val credentials = schoolsWeb.login(username, password)
-        val userID = schoolsWeb.authenticatedUserID ?: throw AuthorizationUnsuccessful()
+        val userID = schoolsWeb.authenticatedUserID
+        if (userID == null) {
+            schoolsWeb.destroy()
+            throw AuthorizationUnsuccessful()
+        }
         if (!doesUserExist(userID)) {
+            schoolsWeb.destroy()
             throw UserNotRegistered("User with ID $userID is not registered")
         }
         try {
@@ -162,6 +178,7 @@ class AuthController {
                 registrar.registerTeacherTimetable(userID, schoolsWeb)
             }
         } catch (e: IllegalArgumentException) {
+            schoolsWeb.destroy()
             logger.error(e)
             throw UnknownError()
         } catch (e: NoSuchElementException) {
@@ -178,6 +195,7 @@ class AuthController {
             )
         }
         val token = issueToken(userID)
+        schoolsWeb.destroy()
         return EversityJWT.instance.sign(userID.toString(), token)
     }
 }
