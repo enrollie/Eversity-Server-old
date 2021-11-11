@@ -19,7 +19,7 @@ import by.enrollie.eversity.database.tables.Users
 import by.enrollie.eversity.exceptions.UserNotRegistered
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
@@ -39,7 +39,7 @@ fun doesUserExist(userID: Int): Boolean {
         Users.select { Users.id eq userID }.toList()
     }
     if (tos.isNotEmpty())
-        CoroutineScope(Dispatchers.Default).launch { cacheUser(User(userID, getUserType(userID))) }
+        CoroutineScope(Dispatchers.Default).async { cacheUser(User(userID, getUserType(userID))) }
     return tos.isNotEmpty()
 }
 

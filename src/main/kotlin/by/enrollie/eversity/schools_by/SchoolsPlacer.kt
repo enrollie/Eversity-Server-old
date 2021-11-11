@@ -22,6 +22,7 @@ import org.slf4j.Logger
 import java.text.SimpleDateFormat
 import java.util.*
 
+@Deprecated("As Schools.by placing functionality is dead, this class is useless", level = DeprecationLevel.ERROR)
 class SchoolsPlacer : SchoolsWebWrapper {
 
     companion object {
@@ -112,7 +113,7 @@ class SchoolsPlacer : SchoolsWebWrapper {
         date: String = SimpleDateFormat("YYYY-MM-dd").format(Calendar.getInstance().time)
     ): Pair<Int, List<Short>?> {
         return Pair(absenceList.size, absenceList.map { it.first }) //Unfortunately, Schools.by killed their API,
-                                                                    //so currently sending absence data to them is not possible
+        //so currently sending absence data to them is not possible
         /*
         val pupilTimetable = try {
             JsonObject(mapOf())
