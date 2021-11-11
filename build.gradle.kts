@@ -60,7 +60,7 @@ dependencies {
     implementation("io.ktor:ktor-gson:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-apache:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-websockets:$ktorVersion")
     implementation("org.apache.logging.log4j:log4j-api:2.14.1")
     implementation("org.apache.logging.log4j:log4j-core:2.14.1")
@@ -82,11 +82,16 @@ dependencies {
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation("team.yi.ktor:ktor-banner:0.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2-native-mt") {
+        version {
+            strictly("1.5.2-native-mt")
+        }
+    }
     implementation("org.docx4j:docx4j-core:11.2.9") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("org.docx4j:docx4j-openxml-objects:11.2.9"){
+    implementation("org.docx4j:docx4j-openxml-objects:11.2.9") {
         exclude("log4j")
         exclude("org.slf4j")
     }

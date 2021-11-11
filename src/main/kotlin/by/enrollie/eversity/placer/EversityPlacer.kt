@@ -48,7 +48,7 @@ class EversityPlacer(logger: Logger) {
                 if (queue.isNotEmpty()) {
                     if (_schoolsByAvailable) {
                         val element = queue.poll()
-                        withContext(Dispatchers.IO + supervisorJob) {
+                        withContext(this.coroutineContext + supervisorJob) {
                             launch(CoroutineExceptionHandler { _, throwable ->
                                 _jobStatuses[element.first] = PlacingStatus.ERROR
                                 log.error(throwable)

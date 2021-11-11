@@ -14,6 +14,7 @@ import by.enrollie.eversity.data_functions.toTimeConstraint
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.features.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -26,14 +27,34 @@ import it.skrape.exceptions.ElementNotFoundException
 import it.skrape.selects.html5.*
 import org.slf4j.Logger
 
+private val userAgent = "Eversity/1.0 (Windows NT 10.0; Win32; x86; rv:1.0) Ktor/1.0.0 Eversity/1.0"
+
+private val singleClient = HttpClient(CIO) {
+    followRedirects = true
+    expectSuccess = false
+    engine {
+        threadsCount = 50
+    }
+    install(HttpTimeout) {
+        connectTimeoutMillis = 1000
+        requestTimeoutMillis = 1000
+        socketTimeoutMillis = 2000
+    }
+    defaultRequest {
+        userAgent(userAgent)
+        timeout {
+            connectTimeoutMillis = 1000
+            requestTimeoutMillis = 1000
+            socketTimeoutMillis = 2000
+        }
+    }
+}
 
 /**
  * A library for parsing and making data out of Schools.by HTML pages
  * @author Pavel Matusevich
  */
 open class SchoolsWebWrapper {
-    private val userAgent = "Eversity/1.0 (Windows NT 10.0; Win32; x86; rv:1.0) KTor/1.5.4 Eversity/1.0"
-
     protected var subdomainURL: String = "https://demo.schools.by/"
     private var schoolsBYCookies: Pair<String, String> = Pair("", "")
 
@@ -54,21 +75,22 @@ open class SchoolsWebWrapper {
     private var isClientReady: Boolean = true
     private var lastStackTrace: Array<java.lang.StackTraceElement> = arrayOf()
 
-    protected var client = HttpClient {
-        followRedirects = true
-        expectSuccess = false
-        defaultRequest {
-            cookie("csrftoken", schoolsBYCookies.first)
-            cookie("sessionid", schoolsBYCookies.second)
-            userAgent(userAgent)
-            timeout {
-                connectTimeoutMillis = 1000
-                requestTimeoutMillis = 1000
-                socketTimeoutMillis = 2000
-            }
-            lastStackTrace = Exception().stackTrace
-        }
-    }
+    protected var client = singleClient
+//        HttpClient(CIO) {
+//        followRedirects = true
+//        expectSuccess = false
+//        defaultRequest {
+//            cookie("csrftoken", schoolsBYCookies.first)
+//            cookie("sessionid", schoolsBYCookies.second)
+//            userAgent(userAgent)
+//            timeout {
+//                connectTimeoutMillis = 1000
+//                requestTimeoutMillis = 1000
+//                socketTimeoutMillis = 2000
+//            }
+//            lastStackTrace = Exception().stackTrace
+//        }
+//    }
 
     /**
      * Constructs wrapper with default settings. You need to login before using other functions,
@@ -171,18 +193,18 @@ open class SchoolsWebWrapper {
             ?: throw NoSuchElementException("SessionID not found after finalCSRFresponse")
         val sessionid = sessionidCookie.value
         schoolsBYCookies = Pair(csrfToken, sessionid)
-        client = client.config {
-            defaultRequest {
-                cookie("csrftoken", schoolsBYCookies.first)
-                cookie("sessionid", schoolsBYCookies.second)
-                userAgent(userAgent)
-                timeout {
-                    connectTimeoutMillis = 1000
-                    requestTimeoutMillis = 1000
-                    socketTimeoutMillis = 2000
-                }
-            }
-        }
+//        client = client.config {
+//            defaultRequest {
+//                cookie("csrftoken", schoolsBYCookies.first)
+//                cookie("sessionid", schoolsBYCookies.second)
+//                userAgent(userAgent)
+//                timeout {
+//                    connectTimeoutMillis = 1000
+//                    requestTimeoutMillis = 1000
+//                    socketTimeoutMillis = 2000
+//                }
+//            }
+//        }
         userType = when {
             finalCSRFresponse.headers["location"]?.contains("pupil") == true -> APIUserType.Pupil
             finalCSRFresponse.headers["location"]?.contains("teacher") == true -> APIUserType.Teacher
@@ -240,12 +262,6 @@ open class SchoolsWebWrapper {
         } catch (e: ElementNotFoundException) {
             if (changeInternal && cookies != null) {
                 schoolsBYCookies = cookies
-                client = client.config {
-                    defaultRequest {
-                        cookie("csrftoken", schoolsBYCookies.first)
-                        cookie("sessionid", schoolsBYCookies.second)
-                    }
-                }
             }
             return true //Login form not found => we are logged in.
         }
@@ -263,6 +279,9 @@ open class SchoolsWebWrapper {
     suspend fun fetchPupilsArray(classID: Int): Array<Pupil> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("${subdomainURL}class/$classID/pupils")
             method = HttpMethod.Get
         }
@@ -309,6 +328,9 @@ open class SchoolsWebWrapper {
     suspend fun fetchClassForTeacher(classID: Int): Int {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("$subdomainURL/class/$classID")
             method = HttpMethod.Get
         }
@@ -348,6 +370,9 @@ open class SchoolsWebWrapper {
     suspend fun fetchClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("$subdomainURL/class/$classID/timetable")
             method = HttpMethod.Get
             expectSuccess = false
@@ -447,6 +472,7 @@ open class SchoolsWebWrapper {
                 cookie("csrftoken", schoolsBYCookies.first)
                 cookie("sessionid", schoolsBYCookies.second)
                 url.takeFrom("https://schools.by/login")
+                userAgent(userAgent)
                 method = HttpMethod.Get
             }
         }
@@ -491,6 +517,9 @@ open class SchoolsWebWrapper {
     suspend fun fetchTeacherTimetable(userID: Int): Pair<Map<DayOfWeek, Array<TeacherLesson>>?, Map<DayOfWeek, Array<TeacherLesson>>?> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("${subdomainURL}teacher/$userID/timetable")
             method = HttpMethod.Get
         }
@@ -591,6 +620,9 @@ open class SchoolsWebWrapper {
     suspend fun fetchParentPupils(parentID: Int): List<Pupil> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("${subdomainURL}parent/$parentID")
             method = HttpMethod.Get
         }
@@ -666,6 +698,9 @@ open class SchoolsWebWrapper {
     suspend fun getPupilClass(pupilID: Int): Pair<Int, String> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("${subdomainURL}pupil/$pupilID")
             method = HttpMethod.Get
         }
@@ -704,6 +739,9 @@ open class SchoolsWebWrapper {
     suspend fun getUserName(userID: Int): Pair<String, String> {
         lastStackTrace = Exception().stackTrace
         val response = client.request<HttpResponse> {
+            cookie("csrftoken", schoolsBYCookies.first)
+            cookie("sessionid", schoolsBYCookies.second)
+            userAgent(userAgent)
             url.takeFrom("${subdomainURL}user/$userID")
             method = HttpMethod.Get
         }
@@ -755,7 +793,7 @@ open class SchoolsWebWrapper {
      * Closes Ktor client for correct
      */
     fun destroy() {
-        client.close()
+//        client.close()
         isClientReady = false
     }
 
