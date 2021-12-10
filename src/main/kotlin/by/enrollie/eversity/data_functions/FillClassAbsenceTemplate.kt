@@ -69,7 +69,7 @@ fun fillClassAbsenceTemplate(
         getClass(classID).title,
         dates.first,
         dates.second,
-        SimpleDateFormat("dd.mm.YYYY").format(Calendar.getInstance().time)
+        SimpleDateFormat("dd.MM.YYYY").format(Calendar.getInstance().time)
     )
     val summaries = AbsenceSummary(
         absences.sumOf { it.totalSkippedLessons },
