@@ -7,23 +7,24 @@
 
 package by.enrollie.eversity.database.functions
 
-import by.enrollie.eversity.data_classes.DayOfWeek
-import by.enrollie.eversity.data_classes.Lesson
-import by.enrollie.eversity.data_classes.Pupil
-import by.enrollie.eversity.data_classes.SchoolClass
+import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.cacheClass
 import by.enrollie.eversity.database.cacheClassTimetable
 import by.enrollie.eversity.database.findCachedClass
 import by.enrollie.eversity.database.findCachedClassTimetable
+import by.enrollie.eversity.database.tables.Absences
 import by.enrollie.eversity.database.tables.ClassTimetables
 import by.enrollie.eversity.database.tables.Classes
 import by.enrollie.eversity.database.tables.Pupils
 import by.enrollie.eversity.exceptions.ClassNotRegistered
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
+import org.joda.time.DateTimeConstants
 
 /**
  * Checks, whether class exists.
@@ -149,4 +150,43 @@ fun countPupils(): Pair<Int, Int> {
         )
     }
     return Pair(firstShift, secondShift)
+}
+
+fun getClassStatistics(
+    classID: Int,
+    startDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.MONDAY),
+    endDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY)
+): List<Pair<Pupil, ExtendedPupilAbsenceStatistics>> {
+    val (pupils, absences) = transaction {
+        Pair(
+            Pupils.select {
+                Pupils.classID eq classID
+            }.toList().map {
+                Pupil(
+                    it[Pupils.id],
+                    it[Pupils.firstName],
+                    it[Pupils.lastName],
+                    classID
+                )
+            },
+            Absences.select {
+                (Absences.classID eq classID) and (Absences.date greaterEq startDate) and (Absences.date lessEq endDate) and (Absences.pupilID neq null)
+            }.toList().map {
+                Absence(
+                    it[Absences.pupilID]!!,
+                    classID,
+                    it[Absences.date].toString("YYYY-mm-dd"),
+                    AbsenceReason.valueOf(it[Absences.reason]),
+                    Json.decodeFromString(it[Absences.absenceList])
+                )
+            }
+        )
+    }
+    val resultList = mutableListOf<Pair<Pupil, ExtendedPupilAbsenceStatistics>>()
+    pupils.forEach { pupil ->
+        resultList.add(
+            Pair(pupil, ExtendedPupilAbsenceStatistics(absences.filter { it.pupilID == pupil.id }))
+        )
+    }
+    return resultList
 }

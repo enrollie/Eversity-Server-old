@@ -7,7 +7,10 @@
 
 package by.enrollie.eversity.routes
 
+import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.data_functions.fillClassAbsenceTemplate
 import by.enrollie.eversity.database.functions.*
+import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -15,8 +18,11 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.joda.time.DateTime
 import org.joda.time.DateTimeConstants
 import org.joda.time.format.DateTimeFormat
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.math.abs
 
 fun Route.classesRoute() {
@@ -89,6 +95,54 @@ fun Route.classesRoute() {
                     status = HttpStatusCode.OK,
                     text = Json.encodeToString(absences)
                 )
+            }
+            get("/absence/statistics") {
+                if ((call.request.queryParameters["startDate"] != null && call.request.queryParameters["endDate"] == null) ||
+                    (call.request.queryParameters["startDate"] == null && call.request.queryParameters["endDate"] != null) // one of parameters is present, but other one is not
+                ) {
+                    return@get call.respond(HttpStatusCode.BadRequest, "Date range is malformed")
+                }
+                val classID = call.parameters["id"]?.toIntOrNull() ?: return@get call.respondText(
+                    "Missing or malformed ID",
+                    status = HttpStatusCode.BadRequest
+                )
+                val user = call.authentication.principal<User>() ?: return@get call.respond(
+                    HttpStatusCode.Unauthorized,
+                    "Authentication failed. Check your token."
+                )
+                when (user.type) {
+                    APIUserType.Parent, APIUserType.Pupil -> return@get call.respond(HttpStatusCode.Forbidden)
+                    APIUserType.Teacher -> {
+                        if (getClass(classID).classTeacherID != user.id)
+                            return@get call.respond(HttpStatusCode.Forbidden)
+                    }
+                    else -> {}
+                }
+                val beginDate =
+                    call.request.queryParameters["startDate"]?.let {
+                        DateTimeFormat.forPattern("YYYY-mm-dd").parseDateTime(it)
+                    }
+                        ?: DateTime.now().withDayOfWeek(DateTimeConstants.MONDAY)
+                val endDate = call.request.queryParameters["endDate"]?.let {
+                    DateTimeFormat.forPattern("YYYY-mm-dd").parseDateTime(it)
+                }
+                    ?: DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY)
+                val absencePackage = getClassStatistics(classID, beginDate, endDate)
+                val resultFile = fillClassAbsenceTemplate(
+                    this.javaClass.getResourceAsStream("/classAbsenceReport.docx")!!,
+                    absencePackage,
+                    classID,
+                    Pair(beginDate.toString("dd.mm.YYYY"), endDate.toString("dd.mm.YYYY"))
+                )
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    ContentDisposition.Attachment.withParameter(
+                        ContentDisposition.Parameters.FileName,
+                        "Eversity-class-$classID-${SimpleDateFormat("YYYY-MM-dd--HH-mm-ss").format(Calendar.getInstance().time)}.docx"
+                    ).toString()
+                )
+                call.respondFile(resultFile)
+                resultFile.delete()
             }
             get("/absence/day/{date}") {
                 val classID = call.parameters["id"]?.toIntOrNull() ?: return@get call.respondText(

@@ -76,6 +76,21 @@ dependencies {
     implementation("org.postgresql:postgresql:42.3.1")
     //----END OF DATABASE DEPENDENCIES
 
+    //----REPORT DEPENDENCIES
+    implementation("fr.opensagres.xdocreport:template:2.0.2")
+    implementation("fr.opensagres.xdocreport:document:2.0.2")
+    implementation("fr.opensagres.xdocreport:template:2.0.2")
+    implementation("fr.opensagres.xdocreport:converter:2.0.2")
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.document.docx:2.0.2")
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.velocity:2.0.2")
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.freemarker:2.0.2")
+    implementation("org.apache.velocity:velocity:1.7")
+    implementation("org.apache.commons:commons-collections4:4.4")
+    implementation("org.apache.commons:commons-lang3:3.12.0")
+    implementation("oro:oro:2.0.8")
+    //----END OF REPORT DEPENDENCIES
+
+
     //----OTHER DEPENDENCIES
     implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.18.2")
