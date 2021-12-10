@@ -120,11 +120,11 @@ fun Route.classesRoute() {
                 }
                 val beginDate =
                     call.request.queryParameters["startDate"]?.let {
-                        DateTimeFormat.forPattern("YYYY-mm-dd").parseDateTime(it)
+                        DateTimeFormat.forPattern("YYYY-MM-dd").parseDateTime(it)
                     }
                         ?: DateTime.now().withDayOfWeek(DateTimeConstants.MONDAY)
                 val endDate = call.request.queryParameters["endDate"]?.let {
-                    DateTimeFormat.forPattern("YYYY-mm-dd").parseDateTime(it)
+                    DateTimeFormat.forPattern("YYYY-MM-dd").parseDateTime(it)
                 }
                     ?: DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY)
                 val absencePackage = getClassStatistics(classID, beginDate, endDate)
@@ -132,7 +132,7 @@ fun Route.classesRoute() {
                     this.javaClass.getResourceAsStream("/classAbsenceReport.docx")!!,
                     absencePackage,
                     classID,
-                    Pair(beginDate.toString("dd.mm.YYYY"), endDate.toString("dd.mm.YYYY"))
+                    Pair(beginDate.toString("dd.MM.YYYY"), endDate.toString("dd.MM.YYYY"))
                 )
                 call.response.header(
                     HttpHeaders.ContentDisposition,
