@@ -14,7 +14,7 @@ import by.enrollie.eversity.database.tables.Pupils
 import by.enrollie.eversity.exceptions.UserNotRegistered
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -39,7 +39,7 @@ fun getPupilClass(userID: Int): Int {
             Pupils.id eq userID
         }.toList().firstOrNull()
     } ?: throw IllegalArgumentException("Pupil with ID $userID not found in Pupils table.")
-    CoroutineScope(Dispatchers.Default).launch{
+    CoroutineScope(Dispatchers.Default).async {
         getUserName(
             userID,
             APIUserType.Pupil
