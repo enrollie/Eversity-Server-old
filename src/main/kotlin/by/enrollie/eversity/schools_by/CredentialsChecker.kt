@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -8,10 +8,12 @@
 package by.enrollie.eversity.schools_by
 
 import by.enrollie.eversity.N_Placer
-import by.enrollie.eversity.database.functions.getAllCredentials
+import by.enrollie.eversity.database.functions.deleteSchoolsByCredentials
+import by.enrollie.eversity.database.functions.getAllSchoolsByCredentials
 import by.enrollie.eversity.database.functions.invalidateAllTokens
-import by.enrollie.eversity.database.functions.removeCredentials
 import by.enrollie.eversity.launchPeriodicAsync
+import com.neitex.Credentials
+import com.neitex.SchoolsByParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,7 +22,6 @@ import org.joda.time.DateTime
 import org.slf4j.Logger
 import java.util.*
 import java.util.concurrent.TimeUnit
-import javax.naming.AuthenticationException
 
 /**
  * Checks Schools.by credentials automatically
@@ -41,45 +42,29 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
         checkerScope = CoroutineScope(Dispatchers.Default)
         checkerFunction = {
             logger.info("Starting Schools.by credentials validity auto-check")
-            if (!N_Placer.getSchoolsByAvailability()) {
+            if (!N_Placer.schoolsByAvailability) {
                 logger.warn("Current Schools.by credentials auto-check will be skipped because Schools.by is unavailable")
             }
-            val queue: Queue<Pair<Int, Triple<String?, String?, String>>> = LinkedList(getAllCredentials())
+            val queue: Queue<Pair<Int, Pair<String, String>>> = LinkedList(getAllSchoolsByCredentials())
             var invalidatedCounter = 0
-            while (queue.isNotEmpty() && N_Placer.getSchoolsByAvailability()) {
+            while (queue.isNotEmpty() && N_Placer.schoolsByAvailability) {
                 val checkingCredentials = queue.poll()
-                if (checkingCredentials.second.first == null || checkingCredentials.second.second == null) {
-                    if (invalidateAllTokens(checkingCredentials.first, "AUTO_COOKIES_NOT_VALID") != 0) {
-                        logger.info("Invalidated tokens for user ID ${checkingCredentials.first} because one of cookies were null")
-                        invalidatedCounter++
-                    }
-                    continue
-                }
-                val result = try {
-                    SchoolsWebWrapper().singleUse {
-                        validateCookies(
-                            Pair(
-                                checkingCredentials.second.first!!,
-                                checkingCredentials.second.second!!
-                            )
-                        )
-                    }
-                } catch (e: AuthenticationException) {
-                    false
-                } catch (e: UnknownError) {
-                    false
-                }
-                if (!result) {
-                    removeCredentials(checkingCredentials.first)
-                    if (invalidateAllTokens(checkingCredentials.first, "AUTO_COOKIES_NOT_VALID") != 0) {
-                        logger.info("Invalidated tokens for user ID ${checkingCredentials.first} because auto-check failed for Schools.by credentials")
-                        invalidatedCounter++
-                    }
+                val result = SchoolsByParser.AUTH.checkCookies(
+                    Credentials(
+                        checkingCredentials.second.first,
+                        checkingCredentials.second.second
+                    )
+                )
+                if (result.isSuccess && result.getOrNull() == false) {
+                    log.debug("Invalidated tokens for user with ID ${checkingCredentials.first} due to invalid Schools.by credentials")
+                    deleteSchoolsByCredentials(checkingCredentials.first)
+                    invalidateAllTokens(checkingCredentials.first)
+                    invalidatedCounter++
                     continue
                 }
             }
             lastCheckRemoved = Pair(DateTime.now(), invalidatedCounter)
-            if (invalidatedCounter != 0 && N_Placer.getSchoolsByAvailability()) {
+            if (invalidatedCounter != 0 && N_Placer.schoolsByAvailability) {
                 logger.info("During regular Schools.by credentials validation Eversity tokens were invalidated for $invalidatedCounter users")
             }
         }

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2021.
- * Author: Pavel Matusevich as part of Enrollie team
+ * Copyright © 2021 - 2022.
+ * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
  */
@@ -10,11 +10,13 @@ package by.enrollie.eversity.security
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
+import org.slf4j.LoggerFactory
 
 /**
  *
  */
 open class EversityJWT private constructor(secret: String) {
+    val logger = LoggerFactory.getLogger(this::class.java)
     private val algorithm = Algorithm.HMAC256(secret)
     val verifier: JWTVerifier = JWT
         .require(algorithm)

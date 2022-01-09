@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,22 +7,17 @@
 
 package by.enrollie.eversity.database.functions
 
+import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.*
-import by.enrollie.eversity.database.cacheClass
-import by.enrollie.eversity.database.cacheClassTimetable
-import by.enrollie.eversity.database.findCachedClass
-import by.enrollie.eversity.database.findCachedClassTimetable
-import by.enrollie.eversity.database.tables.Absences
-import by.enrollie.eversity.database.tables.ClassTimetables
-import by.enrollie.eversity.database.tables.Classes
-import by.enrollie.eversity.database.tables.Pupils
-import by.enrollie.eversity.exceptions.ClassNotRegistered
+import by.enrollie.eversity.database.xodus_definitions.XodusAbsence
+import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Companion.toAbsenceReason
+import by.enrollie.eversity.database.xodus_definitions.XodusClass
+import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
+import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
+import by.enrollie.eversity.exceptions.noClassError
+import kotlinx.dnq.query.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.joda.time.DateTime
 import org.joda.time.DateTimeConstants
 
@@ -32,124 +27,52 @@ import org.joda.time.DateTimeConstants
  *
  * @return True, if class exists. False otherwise.
  */
-fun doesClassExist(classID: Int): Boolean {
-    return transaction {
-        Classes.select { Classes.classID eq classID }.toList()
-    }.isNotEmpty()
-}
-
-/**
- * Determines, whether class should be updated or not
- * @param classID ID of class
- * @return True, if you SHOULD (!) update class data. False otherwise
- */
-fun shouldUpdateClass(classID: Int): Boolean {
-    val classExisting = doesClassExist(classID)
-    val (existingPupils, existingTimetable) = transaction {
-        Pair(
-            Pupils.select {
-                Pupils.classID eq classID
-            }.toList().isNotEmpty(),
-            ClassTimetables.select {
-                ClassTimetables.id eq classID
-            }.toList().isNotEmpty()
-        )
-    }
-    if (classExisting) {
-        if (existingPupils) {
-            if (existingTimetable)
-                return false
-        }
-    }
-    return true
-}
+fun doesClassExist(classID: Int): Boolean =
+    DATABASE.transactional(readonly = true) { XodusClass.query(XodusClass::id eq classID).any() }
 
 /**
  * Returns class timetable
  * @param classID ID of class
+ * @throws NoSuchElementException Thrown, if class was not found
  * @return Map, containing six arrays of lessons (may be unsorted), mapped to six [DayOfWeek]'s (from Monday to Saturday)
  */
-fun getClassTimetable(classID: Int): Map<DayOfWeek, Array<Lesson>> {
-    if (!doesClassExist(classID)) {
-        throw ClassNotRegistered("Class with ID $classID does not exist")
+fun getClassTimetable(classID: Int): Timetable {
+    val timetableQuery = DATABASE.transactional(readonly = true) {
+        XodusClass.query(XodusClass::id eq classID).first().timetable
     }
-    val cachedTimetable = findCachedClassTimetable(classID)
-    if (cachedTimetable != null)
-        return cachedTimetable
-    val timetableQuery = transaction {
-        ClassTimetables.select {
-            ClassTimetables.id eq classID
-        }.toList().firstOrNull()
-    }
-        ?: throw NoSuchElementException("Class timetable of class with id $classID was not found. Database is waiting for bad times")
     val timetableMap = mutableMapOf<DayOfWeek, Array<Lesson>>()
-    //Danger: big chunk of code incoming
     timetableMap[DayOfWeek.MONDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.monday])
+        Json.decodeFromString(timetableQuery.monday)
     timetableMap[DayOfWeek.TUESDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.tuesday])
+        Json.decodeFromString(timetableQuery.tuesday)
     timetableMap[DayOfWeek.WEDNESDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.wednesday])
+        Json.decodeFromString(timetableQuery.wednesday)
     timetableMap[DayOfWeek.THURSDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.thursday])
+        Json.decodeFromString(timetableQuery.thursday)
     timetableMap[DayOfWeek.FRIDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.friday])
+        Json.decodeFromString(timetableQuery.friday)
     timetableMap[DayOfWeek.SATURDAY] =
-        Json.decodeFromString(timetableQuery[ClassTimetables.saturday])
-    cacheClassTimetable(classID, timetableMap)
-    return timetableMap
+        Json.decodeFromString(timetableQuery.saturday)
+    return Timetable(timetableMap)
 }
 
-fun getClass(classID: Int): SchoolClass {
-    require(doesClassExist(classID)) { "Class with ID $classID does not exist." }
-    val cachedClass = findCachedClass(classID)
-    if (cachedClass != null)
-        return cachedClass
-    val (classData, pupilsData) = transaction {
-        return@transaction Pair(
-            Classes.select {
-                Classes.classID eq classID
-            }.toList().firstOrNull(),
-            Pupils.select {
-                Pupils.classID eq classID
-            }.toList()
-        )
-    }
-    if (classData == null)
-        throw IllegalStateException("Class data is null")
-    val pupilsList = mutableListOf<Pupil>()
-    pupilsData.forEach {
-        pupilsList.add(
-            Pupil(
-                it[Pupils.id],
-                it[Pupils.firstName],
-                it[Pupils.lastName],
-                it[Pupils.classID]
-            )
-        )
-    }
-    val result = SchoolClass(
-        classData[Classes.classID],
-        classData[Classes.name],
-        classData[Classes.classTeacher],
-        pupilsList.toTypedArray()
-    )
-    cacheClass(result)
-    return result
+/**
+ * Returns [SchoolClass] based on given [classID]
+ * @throws NoSuchElementException Thrown if class was not found
+ */
+fun getClass(classID: Int): SchoolClass = DATABASE.transactional(readonly = true) {
+    XodusClass.query(XodusClass::id eq classID).firstOrNull()?.let {
+        SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id, it.pupils.toList().map {
+            Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, classID)
+        }.toTypedArray())
+    } ?: throw NoSuchElementException("No class with ID $classID")
 }
 
-fun countPupils(): Pair<Int, Int> {
-    val (firstShift, secondShift) = transaction {
-        val shifts = Classes.selectAll().toList().map { Pair(it[Classes.classID], it[Classes.isSecondShift]) }
-        val firstShiftClasses = shifts.filter { !it.second }.map { it.first }
-        val secondShiftClasses = shifts.filter { it.second }.map { it.first }
-        val pupils = Pupils.selectAll().toList().map { Pair(it[Pupils.id], it[Pupils.classID]) }
-        return@transaction Pair(
-            pupils.filter { firstShiftClasses.contains(it.second) }.size,
-            pupils.filter { secondShiftClasses.contains(it.second) }.size
-        )
+fun countPupils(): Pair<Int, Int> = DATABASE.transactional(readonly = true) {
+    val pupilsMap = XodusPupilProfile.all().toList().groupBy {
+        it.schoolClass.isSecondShift
     }
-    return Pair(firstShift, secondShift)
+    return@transactional Pair((pupilsMap[false]?.size ?: 0), (pupilsMap[true]?.size ?: 0))
 }
 
 fun getClassStatistics(
@@ -157,27 +80,25 @@ fun getClassStatistics(
     startDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.MONDAY),
     endDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY)
 ): List<Pair<Pupil, ExtendedPupilAbsenceStatistics>> {
-    val (pupils, absences) = transaction {
+    val (pupils, absences) = DATABASE.transactional(readonly = true) {
         Pair(
-            Pupils.select {
-                Pupils.classID eq classID
-            }.toList().map {
-                Pupil(
-                    it[Pupils.id],
-                    it[Pupils.firstName],
-                    it[Pupils.lastName],
-                    classID
-                )
-            },
-            Absences.select {
-                (Absences.classID eq classID) and (Absences.date greaterEq startDate) and (Absences.date lessEq endDate) and (Absences.pupilID neq null)
-            }.toList().map {
+            XodusClass.query(XodusClass::id eq classID).firstOrNull()?.pupils?.toList()?.toPupilsArray()
+                ?: noClassError(classID),
+            XodusAbsence.query(
+                (XodusAbsence::date ge startDate) and (XodusAbsence::date le endDate) and (XodusAbsence::schoolClass.matches(
+                    XodusClass::id eq classID
+                ) and (XodusAbsence::pupil ne null))
+            ).toList().map {
                 Absence(
-                    it[Absences.pupilID]!!,
-                    classID,
-                    it[Absences.date].toString("YYYY-mm-dd"),
-                    AbsenceReason.valueOf(it[Absences.reason]),
-                    Json.decodeFromString(it[Absences.absenceList])
+                    it.pupil!!.user.id,
+                    it.schoolClass.id,
+                    it.sentBy?.id,
+                    it.date,
+                    it.reason.toAbsenceReason(),
+                    it.lessons.toList(),
+                    it.additionalNotes?.let { note->
+                        AbsenceNoteJSON.decodeFromString(note.note)
+                    }
                 )
             }
         )

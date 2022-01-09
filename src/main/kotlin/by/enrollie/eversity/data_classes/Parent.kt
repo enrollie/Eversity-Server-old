@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,32 +7,26 @@
 
 package by.enrollie.eversity.data_classes
 
+import by.enrollie.eversity.database.xodus_definitions.XodusParentProfile
+import by.enrollie.eversity.database.xodus_definitions.XodusUser
+import jetbrains.exodus.database.TransientEntityStore
+import kotlinx.dnq.query.*
 import kotlinx.serialization.Serializable
 
 
 @Serializable
-data class Parent(val id:Int, val firstName:String, val middleName:String, val secondName:String, val pupils: Array<Pupil>) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
+class Parent(
+    override val id: Int,
+    override val firstName: String,
+    override val middleName: String?,
+    override val lastName: String
+) : User {
+    override val type: UserType = UserType.Parent
 
-        other as Parent
-
-        if (id != other.id) return false
-        if (firstName != other.firstName) return false
-        if (middleName != other.middleName) return false
-        if (secondName != other.secondName) return false
-        if (!pupils.contentEquals(other.pupils)) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = id
-        result = 31 * result + firstName.hashCode()
-        result = 31 * result + middleName.hashCode()
-        result = 31 * result + secondName.hashCode()
-        result = 31 * result + pupils.contentHashCode()
-        return result
+    fun getPupils(store: TransientEntityStore): Array<Pupil>? = store.transactional {
+        XodusParentProfile.query(XodusParentProfile::user.matches(XodusUser::id eq id)).firstOrNull()?.pupils?.toList()
+            ?.map {
+                Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, it.schoolClass.id)
+            }?.toTypedArray()
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,10 +7,12 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.data_classes.DayOfWeek
-import by.enrollie.eversity.data_classes.TeacherLesson
-import by.enrollie.eversity.database.functions.*
+import by.enrollie.eversity.data_classes.UserType
+import by.enrollie.eversity.database.functions.doesUserExist
+import by.enrollie.eversity.database.functions.getTeacherClass
+import by.enrollie.eversity.database.functions.getTeacherTimetable
+import by.enrollie.eversity.database.functions.getUserType
 import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
@@ -32,7 +34,7 @@ fun Route.teachersRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (userJWT.type == APIUserType.Parent || userJWT.type == APIUserType.Pupil) {
+                if (userJWT.type == UserType.Parent || userJWT.type == UserType.Pupil) {
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You are not authorized to do this"
@@ -46,16 +48,16 @@ fun Route.teachersRoute() {
                     HttpStatusCode.NotFound,
                     "User with ID $teacherID was not found"
                 )
-                if (getUserType(teacherID) != APIUserType.Teacher && getUserType(teacherID) != APIUserType.Administration) return@get call.respond(
+                if (getUserType(teacherID) != UserType.Teacher && getUserType(teacherID) != UserType.Administration) return@get call.respond(
                     HttpStatusCode.BadRequest,
                     "User with ID $teacherID is not a teacher"
                 )
-                val teacherClass = getTeacher(teacherID)
-                val classData = teacherClass.second.let { if (it != null) getClass(it) else null }
+                val classData = getTeacherClass(teacherID)
                 call.respond(
                     HttpStatusCode.OK, mapOf(
                         "classID" to Json.encodeToJsonElement(classData?.id),
-                        "className" to Json.encodeToJsonElement(classData?.title)
+                        "className" to Json.encodeToJsonElement(classData?.title),
+                        "isSecondShift" to Json.encodeToJsonElement(classData?.isSecondShift)
                     )
                 )
             }
@@ -64,7 +66,7 @@ fun Route.teachersRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (userJWT.type == APIUserType.Parent || userJWT.type == APIUserType.Pupil) {
+                if (userJWT.type == UserType.Parent || userJWT.type == UserType.Pupil) {
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You are not authorized to do this"
@@ -78,35 +80,25 @@ fun Route.teachersRoute() {
                     HttpStatusCode.NotFound,
                     "User with ID $teacherID was not found"
                 )
-                if (getUserType(teacherID) != APIUserType.Teacher && getUserType(teacherID) != APIUserType.Administration) return@get call.respond(
+                if (getUserType(teacherID) != UserType.Teacher && getUserType(teacherID) != UserType.Administration) return@get call.respond(
                     HttpStatusCode.BadRequest,
                     "User with ID $teacherID is not a teacher"
                 )
                 val timetable = getTeacherTimetable(teacherID)
-                val lessons = mutableListOf<TeacherLesson>()
-                timetable.toList().forEach {
-                    if (it != null) {
-                        val day = it[DayOfWeek.values()[DateTime.now().dayOfWeek - 1]]
-                        if (day != null) {
-                            val lesson = day.find {
-                                Interval(MutableDateTime().apply {
-                                    hourOfDay = it.schedule.startHour.toInt()
-                                    minuteOfHour = it.schedule.startMinute.toInt()
-                                }, MutableDateTime().apply {
-                                    if (it.schedule.startHour > it.schedule.endHour)
-                                        addDays(1)
-                                    hourOfDay = it.schedule.endHour.toInt()
-                                    minuteOfHour = it.schedule.endMinute.toInt()
-                                }).contains(DateTime.now(DateTimeZone.getDefault()))
-                            }
-                            if (lesson!=null)
-                                lessons.add(lesson)
-                        }
-                    }
-                }
+                val currentDayTimetable = timetable.get(DayOfWeek.values()[DateTime.now().dayOfWeek - 1])
                 call.respond(
                     HttpStatusCode.OK, mapOf(
-                        "currentLesson" to Json.encodeToJsonElement(lessons.firstOrNull())
+                        "currentLesson" to Json.encodeToJsonElement((currentDayTimetable.first + currentDayTimetable.second).find {
+                            Interval(MutableDateTime().apply {
+                                hourOfDay = it.schedule.startHour.toInt()
+                                minuteOfHour = it.schedule.startMinute.toInt()
+                            }, MutableDateTime().apply {
+                                if (it.schedule.startHour > it.schedule.endHour)
+                                    addDays(1)
+                                hourOfDay = it.schedule.endHour.toInt()
+                                minuteOfHour = it.schedule.endMinute.toInt()
+                            }).contains(DateTime.now(DateTimeZone.getDefault()))
+                        })
                     )
                 )
             }

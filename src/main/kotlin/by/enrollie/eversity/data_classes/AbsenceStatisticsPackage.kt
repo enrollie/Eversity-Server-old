@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -24,5 +24,6 @@ data class AbsenceStatisticsPackage(
             AbsenceReason.REQUEST -> request
             AbsenceReason.COMPETITION -> competition
             AbsenceReason.UNKNOWN -> unknown
+            else -> 0
         }
 }

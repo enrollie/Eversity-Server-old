@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -24,9 +24,11 @@ fun Application.configureAuthentication() {
             validate { jwtCredential ->
                 val userID = jwtCredential.payload.getClaim("userID").asString().toIntOrNull()
                 val token = jwtCredential.payload.getClaim("token").asString()
-                if (userID != null && checkToken(userID, token).first) {
+                if (userID != null && checkToken(userID, token)) {
+                    EversityJWT.instance.logger.debug("Authenticated user with user ID $userID and token $token")
                     User(userID, getUserType(userID), token)
                 } else {
+                    EversityJWT.instance.logger.debug("Rejected authentication to user with ID $userID and token $token")
                     null
                 }
             }
@@ -38,14 +40,17 @@ fun authenticateWithJWT(jwtToken: String): User? {
     val jwt = try {
         EversityJWT.instance.verifier.verify(jwtToken)
     } catch (e: JWTVerificationException) {
+
         null
     } ?: return null
     val claims = jwt.claims
     val userID = claims["userID"]?.asString()?.toIntOrNull()
     val token = claims["token"]?.asString()
-    return if (userID != null && token != null && checkToken(userID, token).first) {
+    return if (userID != null && token != null && checkToken(userID, token)) {
+        EversityJWT.instance.logger.debug("Authenticated user with user ID $userID and token $token")
         User(userID, getUserType(userID), token)
     } else {
+        EversityJWT.instance.logger.debug("Rejected authentication to user with ID $userID and token $token")
         null
     }
 }

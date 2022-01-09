@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,51 +7,32 @@
 
 package by.enrollie.eversity.database
 
-import by.enrollie.eversity.database.tables.*
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
+import by.enrollie.eversity.database.xodus_definitions.*
+import jetbrains.exodus.database.TransientEntityStore
+import kotlinx.dnq.XdModel
+import kotlinx.dnq.store.container.StaticStoreContainer
+import kotlinx.dnq.util.initMetaData
+import java.io.File
 
-/**
- * Connects to Eversity database and creates all missing tables.
- * Uses PostgreSQL.
- * @param host Database host
- * @param port Database port
- * @param databaseName Database name
- * @param user Database user
- * @param password Database password
- */
-
-fun initDatabase(
-    host: String,
-    port: String,
-    databaseName: String,
-    user: String,
-    password: String
-) {
-    val tables = arrayOf(
-        Classes,
-        Absences,
-        ClassTimetables,
-        Credentials,
-        Pupils,
-        BannedTokens,
-        Teachers,
-        TeachersTimetable,
-        Tokens,
-        Users,
-        Marks,
-        TelegramNotifyData
+fun initXodusDatabase(storeDir: File): TransientEntityStore {
+    val models = arrayOf(
+        XodusUser,
+        XodusAdministrationProfile,
+        XodusAppData,
+        XodusBaseUserProfile,
+        XodusClass,
+        XodusClassTimetable,
+        XodusParentProfile,
+        XodusPupilProfile,
+        XodusTeacherProfile,
+        XodusToken,
+        XodusUserType
     )
 
-    Database.connect(
-        url = "jdbc:postgresql://$host:$port/$databaseName",
-        driver = "org.postgresql.Driver",
-        user = user,
-        password = password
-    )
+    XdModel.registerNodes(*models)
 
-    transaction {
-        SchemaUtils.createMissingTablesAndColumns(*tables)
-    }
+    val store = StaticStoreContainer.init(storeDir, "eversity")
+
+    initMetaData(XdModel.hierarchy, store)
+    return store
 }

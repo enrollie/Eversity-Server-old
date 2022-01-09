@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -8,194 +8,170 @@
 package by.enrollie.eversity.controllers
 
 import by.enrollie.eversity.LOCAL_ACCOUNT_ISSUER
-import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
-import by.enrollie.eversity.exceptions.UserNotRegistered
-import by.enrollie.eversity.schools_by.SchoolsWebWrapper
+import by.enrollie.eversity.exceptions.NotAllPupilsRegistered
+import by.enrollie.eversity.exceptions.PupilsAreNotAllowedToRegister
 import by.enrollie.eversity.security.EversityJWT
-import io.ktor.util.*
+import com.neitex.SchoolsByParser
 import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class AuthController {
-
-    private val registrar = Registrar()
-
-    companion object {
-        lateinit var logger: Logger
-            private set
-
-        fun initialize(mainLogger: Logger) {
-            synchronized(this) {
-                logger = mainLogger
-            }
-        }
-    }
-
+    private val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     /**
      * Registers user and all it's data in database
-     * @throws AuthorizationUnsuccessful Thrown, if Schools.by rejected credentials
      * @return Eversity access token
      */
-    suspend fun registerUser(username: String, password: String): String {
-        val schoolsWeb = SchoolsWebWrapper()
-        val credentials = schoolsWeb.login(username, password)
-        val userID = schoolsWeb.authenticatedUserID
-        if (userID == null) {
-            schoolsWeb.destroy()
-            throw AuthorizationUnsuccessful()
-        }
-        if (doesUserExist(userID)) {
-            schoolsWeb.destroy()
-            return loginUser(username, password)
-        }
-        when (schoolsWeb.userType) {
-            APIUserType.Pupil -> {
-                val (classID, className) = schoolsWeb.getPupilClass(userID)
-                if (!doesClassExist(classID)) {
-                    try {
-                        registrar.registerClass(classID, className, schoolsWeb)
-                    } catch (e: IllegalArgumentException) {
-                        schoolsWeb.destroy()
-                        logger.error(e)
-                        throw UnknownError("Schools web wrapper has invalid cookies")
-                    }
+    suspend fun registerUser(username: String, password: String): Result<String> {
+        logger.debug("Beginning registering process for username \'$username\'...")
+        val credentials = SchoolsByParser.AUTH.getLoginCookies(username, password)
+            .fold(onSuccess = { it }, onFailure = {
+                return if (it is com.neitex.AuthorizationUnsuccessful)
+                    Result.failure(AuthorizationUnsuccessful())
+                else Result.failure(it)
+            })
+        val userID = SchoolsByParser.USER.getUserIDFromCredentials(credentials)
+            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+        val userInfo = SchoolsByParser.USER.getBasicUserInfo(userID, credentials)
+            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+        logger.debug("Obtained user info; userID: $userID; userinfo: $userInfo")
+        when (userInfo.type.toUserType()) {
+            UserType.Pupil -> {
+                val pupilSchoolClass =
+                    SchoolsByParser.PUPIL.getPupilClass(userID, credentials)
+                        .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                if (!doesClassExist(pupilSchoolClass.id)) {
+                    logger.debug("Registering class \'$pupilSchoolClass\'...")
+                    val pupilsArray =
+                        SchoolsByParser.CLASS.getPupilsList(pupilSchoolClass.id, credentials)
+                            .fold(onSuccess = {
+                                it.map { pupil ->
+                                    Pupil(
+                                        pupil.id,
+                                        pupil.name.firstName,
+                                        pupil.name.middleName,
+                                        pupil.name.lastName,
+                                        pupil.classID
+                                    )
+                                }.toTypedArray()
+                            }, onFailure = { return Result.failure(it) })
+                    val teacherTimetable =
+                        SchoolsByParser.TEACHER.getTimetable(pupilSchoolClass.classTeacherID, credentials)
+                            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                    val teacherProfile =
+                        SchoolsByParser.USER.getBasicUserInfo(pupilSchoolClass.classTeacherID, credentials)
+                            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                    val classTimetable =
+                        SchoolsByParser.CLASS.getTimetable(pupilSchoolClass.id, credentials, guessShift = true)
+                            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                    registerTeacher(
+                        teacherProfile.id,
+                        UserName.fromParserName(teacherProfile.name),
+                        null,
+                        TwoShiftsTimetable(teacherTimetable)
+                    )
+                    registerClass(
+                        pupilSchoolClass.id,
+                        pupilSchoolClass.classTeacherID,
+                        pupilSchoolClass.classTitle,
+                        classTimetable.first!!, Timetable(classTimetable.second)
+                    )
+                    registerManyPupils(pupilsArray)
+                    logger.debug("Registered class \'$pupilSchoolClass\' and it's teacher \'$teacherProfile\'")
                 }
-                registerPupil(
-                    userID,
-                    schoolsWeb.getUserName(userID),
-                    classID
-                )
-                insertOrUpdateCredentials(
-                    userID,
-                    Triple(credentials.first, credentials.second, "")
-                )
-                schoolsWeb.destroy()
-                val eversityToken = issueToken(userID)
-                return EversityJWT.instance.sign(userID.toString(), eversityToken)
+                return Result.failure(PupilsAreNotAllowedToRegister()) // As no features are available to pupils to use
             }
-            APIUserType.Teacher -> {
-                val classData = schoolsWeb.fetchClassForCurrentUser()
+            UserType.Teacher, UserType.Administration -> {
+                val timetable = SchoolsByParser.TEACHER.getTimetable(userID, credentials)
+                    .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                val classData = SchoolsByParser.TEACHER.getClassForTeacher(userID, credentials)
+                    .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
                 if (classData != null) {
-                    registrar.registerClass(classData.first, classData.second, schoolsWeb)
-                    val name = schoolsWeb.getUserName(userID)
+                    val pupilsArray =
+                        SchoolsByParser.CLASS.getPupilsList(classData.id, credentials)
+                            .fold(onSuccess = {
+                                it.map { pupil ->
+                                    Pupil(
+                                        pupil.id,
+                                        pupil.name.firstName,
+                                        pupil.name.middleName,
+                                        pupil.name.lastName,
+                                        pupil.classID
+                                    )
+                                }.toTypedArray()
+                            }, onFailure = { return Result.failure(it) })
+                    val classTimetable =
+                        SchoolsByParser.CLASS.getTimetable(classData.id, credentials, guessShift = true)
+                            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
                     registerTeacher(
                         userID,
-                        Triple(
-                            name.first,
-                            name.second.split(" ")[1],
-                            name.second.split(" ").first()
-                        ),
-                        credentials,
-                        "",
-                        classData.first
+                        UserName.fromParserName(userInfo.name),
+                        Pair(credentials.csrfToken, credentials.sessionID),
+                        TwoShiftsTimetable(timetable),
+                        isAdministration = userInfo.type.toUserType() == UserType.Administration
                     )
+                    registerClass(
+                        classData.id,
+                        userID,
+                        classData.classTitle,
+                        classTimetable.first!!, Timetable(classTimetable.second)
+                    )
+                    registerManyPupils(pupilsArray)
                 } else {
-                    val name = schoolsWeb.getUserName(userID)
                     registerTeacher(
                         userID,
-                        Triple(
-                            name.first,
-                            name.second.split(" ")[1],
-                            name.second.split(" ").first()
-                        ),
-                        credentials,
-                        ""
+                        UserName.fromParserName(userInfo.name),
+                        Pair(credentials.csrfToken, credentials.sessionID),
+                        TwoShiftsTimetable(timetable)
                     )
                 }
-                registrar.registerTeacherTimetable(userID, schoolsWeb)
-                schoolsWeb.destroy()
                 val eversityToken = issueToken(userID)
-                return EversityJWT.instance.sign(userID.toString(), eversityToken)
+                return Result.success(EversityJWT.instance.sign(userID.toString(), eversityToken))
             }
-            APIUserType.Parent -> {
-                registerParent(userID)
-                insertOrUpdateCredentials(userID, Triple(credentials.first, credentials.second, ""))
-                schoolsWeb.destroy()
-                val eversityToken = issueToken(userID)
-                return EversityJWT.instance.sign(userID.toString(), eversityToken)
-            }
-            APIUserType.Administration -> { //Not possible, as on website (without deep parsing) they are indistinguishable from regular teachers, but still
-                val name = schoolsWeb.getUserName(userID)
-                registerAdministration(
+            UserType.Parent -> {
+                val pupils = SchoolsByParser.PARENT.getPupils(userID, credentials)
+                    .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
+                val notRegisteredPupils = getNonExistentPupilsIDs(pupils.toPupilsList())
+                if (notRegisteredPupils.isNotEmpty())
+                    return Result.failure(NotAllPupilsRegistered(notRegisteredPupils))
+                registerParent(
                     userID,
-                    Triple(
-                        name.first,
-                        name.second.split(" ")[1],
-                        name.second.split(" ").first()
-                    ),
-                    credentials,
-                    ""
+                    UserName.fromParserName(userInfo.name),
+                    Pair(credentials.csrfToken, credentials.sessionID)
                 )
-                registrar.registerTeacherTimetable(userID, schoolsWeb)
+                assignPupilsToParents(pupils.map { Pair(it.id, userID) })
                 val eversityToken = issueToken(userID)
-                schoolsWeb.destroy()
-                return EversityJWT.instance.sign(userID.toString(), eversityToken)
+                return Result.success(EversityJWT.instance.sign(userID.toString(), eversityToken))
             }
             else -> {
-                schoolsWeb.destroy()
-                logger.error("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
-                throw UnknownError("Unknown user type! userData JSON: \'${schoolsWeb.userType}\'")
+                return Result.failure(UnknownError("Schools.by parser returned impossible user type: ${userInfo.type}"))
             }
         }
     }
 
-    suspend fun loginUser(username: String, password: String): String {
+    suspend fun loginUser(username: String, password: String): Result<String> {
         if (username.startsWith("!_Eversity")) {
             val localAccount = LOCAL_ACCOUNT_ISSUER.getUserID(username, password) ?: throw AuthorizationUnsuccessful()
             val token = issueToken(localAccount)
-            return EversityJWT.instance.sign(localAccount.toString(), token)
+            return Result.success(EversityJWT.instance.sign(localAccount.toString(), token))
         }
-        val schoolsWeb = SchoolsWebWrapper()
-        val credentials = schoolsWeb.login(username, password)
-        val userID = schoolsWeb.authenticatedUserID
-        if (userID == null) {
-            schoolsWeb.destroy()
-            throw AuthorizationUnsuccessful()
-        }
+        val credentials = SchoolsByParser.AUTH.getLoginCookies(username, password)
+            .fold(onSuccess = { it }, onFailure = {
+                return if (it is com.neitex.AuthorizationUnsuccessful)
+                    Result.failure(AuthorizationUnsuccessful())
+                else Result.failure(it)
+            })
+        val userID = SchoolsByParser.USER.getUserIDFromCredentials(credentials)
+            .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
         if (!doesUserExist(userID)) {
-            schoolsWeb.destroy()
-            throw UserNotRegistered("User with ID $userID is not registered")
+            logger.debug("User with ID $userID is not registered, registering from login.")
+            return registerUser(username, password)
         }
-        try {
-            val prevCredentials = obtainCredentials(userID)
-            if (prevCredentials.first != null && prevCredentials.second != null) {
-                if (!schoolsWeb.validateCookies(Pair(prevCredentials.first!!, prevCredentials.second!!), true)) {
-                    logger.debug("Credentials of user with ID $userID were invalid, recreating...")
-                    insertOrUpdateCredentials(
-                        userID,
-                        Triple(credentials.first, credentials.second, "")
-                    )
-                }
-                if (schoolsWeb.userType == APIUserType.Teacher) {
-                    val classData = schoolsWeb.fetchClassForCurrentUser()
-                    if (classData != null)
-                        registrar.registerClass(classData.first, classData.second, schoolsWeb)
-                }
-            }
-            if (schoolsWeb.userType == APIUserType.Teacher) {
-                registrar.registerTeacherTimetable(userID, schoolsWeb)
-            }
-        } catch (e: IllegalArgumentException) {
-            schoolsWeb.destroy()
-            logger.error(e)
-            throw UnknownError()
-        } catch (e: NoSuchElementException) {
-            val newCredentials = schoolsWeb.login(username, password)
-            insertOrUpdateCredentials(
-                userID,
-                Triple(newCredentials.first, newCredentials.second, "")
-            )
-        } catch (e: IllegalStateException) {
-            val newCredentials = schoolsWeb.login(username, password)
-            insertOrUpdateCredentials(
-                userID,
-                Triple(newCredentials.first, newCredentials.second, "")
-            )
-        }
+        recordSchoolsByCredentials(userID, Pair(credentials.csrfToken, credentials.sessionID))
         val token = issueToken(userID)
-        schoolsWeb.destroy()
-        return EversityJWT.instance.sign(userID.toString(), token)
+        return Result.success(EversityJWT.instance.sign(userID.toString(), token))
     }
 }

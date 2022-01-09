@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,9 +7,9 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.data_classes.UserType
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.security.User
 import io.ktor.application.*
@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
+import org.joda.time.DateTime
 
 @Serializable
 private data class AnonymousMark(val markNum: Short?, val lessonPlace: Short?)
@@ -46,7 +47,7 @@ fun Route.diaryRoute() {
                     HttpStatusCode.BadRequest,
                     "Class ID was not found or malformed"
                 )
-                if (user.type == APIUserType.Pupil) {
+                if (user.type == UserType.Pupil) {
                     if (getPupilClass(user.id) != classID) {
                         return@get call.respond(
                             HttpStatusCode.Forbidden,
@@ -54,7 +55,7 @@ fun Route.diaryRoute() {
                         )
                     }
                 }
-                if (user.type == APIUserType.Parent) {
+                if (user.type == UserType.Parent) {
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "Parents does not have access to classes"
@@ -81,7 +82,7 @@ fun Route.diaryRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type == APIUserType.Parent || user.type == APIUserType.Pupil)
+                if (user.type == UserType.Parent || user.type == UserType.Pupil)
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You cannot access this route"
@@ -91,7 +92,7 @@ fun Route.diaryRoute() {
                         HttpStatusCode.NotFound,
                         "User with ID $teacherID was not found"
                     )
-                if (getUserType(teacherID) != APIUserType.Teacher)
+                if (getUserType(teacherID) != UserType.Teacher)
                     return@get call.respond(
                         HttpStatusCode.NotFound,
                         "User with ID $teacherID is not a teacher"
@@ -111,7 +112,7 @@ fun Route.diaryRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type == APIUserType.Parent || user.id != pupilID)
+                if (user.type == UserType.Parent || user.id != pupilID)
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You cannot access this route"
@@ -121,14 +122,14 @@ fun Route.diaryRoute() {
                         HttpStatusCode.NotFound,
                         "User with ID $pupilID was not found"
                     )
-                if (getUserType(pupilID) != APIUserType.Pupil)
+                if (getUserType(pupilID) != UserType.Pupil)
                     return@get call.respond(
                         HttpStatusCode.NotFound,
                         "User with ID $pupilID is not a pupil"
                     )
                 return@get call.respondText(
                     contentType = ContentType.Application.Json, text = Json.encodeToString(
-                        getPupilTimetable(pupilID)
+                        getClassTimetable(getPupilClass(pupilID))
                     )
                 )
             }
@@ -149,30 +150,32 @@ fun Route.diaryRoute() {
                         "Class with ID $classID was not found"
                     )
                 }
-                if (user.type == APIUserType.Teacher && !validateTeacherAccessToClass(user.id, classID)) {
+                if (user.type == UserType.Teacher) {
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You cannot access this route"
                     )
                 }
-                if (user.type == APIUserType.Parent || user.type == APIUserType.Pupil)
+                if (user.type == UserType.Parent || user.type == UserType.Pupil)
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
                         "You cannot access this route"
                     )
-                val data = getClassJournal(classID)
+                val data = getClassAbsence(classID, DateTime.now())
+                val pupilsList = getPupilsInClass(classID)
                 val timetable = getClassTimetable(classID)
                 val map = mutableMapOf<Pupil, PupilData>()
-                data.first.forEach {
+                pupilsList.forEach {
                     map[it] = PupilData(it.id, it.firstName, it.lastName, null, listOf())
                 }
-                data.second.forEach {
-                    val temp =
-                        (map[it.pupil] ?: PupilData(it.pupil.id, it.pupil.firstName, it.pupil.lastName, null, listOf()))
-                    map[it.pupil] = temp.copy(
-                        marksList = temp.marksList + AnonymousMark(it.markNum, it.lessonPlace),
-                        absenceReason = data.third[it.pupil]
-                    )
+                data.forEach { absence ->
+                    val temp = map.entries.find { it.key.id == absence.pupilID }?.let {
+                        it.setValue(
+                            it.value.copy(
+                                absenceReason = absence.reason,
+                                marksList = absence.lessonsList.map { AnonymousMark(-1, it) })
+                        )
+                    }
                 }
                 call.respondText(
                     Json.encodeToString(
