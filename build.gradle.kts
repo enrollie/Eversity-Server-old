@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -47,6 +47,7 @@ repositories {
     maven { url = uri("https://maven.pkg.jetbrains.space/public/p/kotlinx-html/maven") }
     maven { url = uri("https://jitpack.io") }
     maven { url = uri("https://packages.neitex.me") }
+    maven { url = uri("https://packages.jetbrains.team/maven/p/xodus/xodus-daily") }
 }
 
 dependencies {
@@ -75,7 +76,8 @@ dependencies {
     implementation("org.jetbrains.xodus:xodus-environment:$xodusVersion")
     implementation("org.jetbrains.xodus:xodus-entity-store:$xodusVersion")
     implementation("org.jetbrains.xodus:xodus-vfs:$xodusVersion")
-    implementation("org.jetbrains.xodus:dnq:1.4.480")
+//    implementation("org.jetbrains.xodus:dnq:1.4.480")
+    implementation("org.jetbrains.xodus-neitex:dnq:dev")
     //----END OF DATABASE DEPENDENCIES
 
     //----REPORT DEPENDENCIES
@@ -94,9 +96,9 @@ dependencies {
 
 
     //----OTHER DEPENDENCIES
-    implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
+//    implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.18.2")
-    implementation("com.neitex:schools_parser:0.0.4")
+    implementation("com.neitex:schools_parser:0.0.5")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation("team.yi.ktor:ktor-banner:0.2.0")

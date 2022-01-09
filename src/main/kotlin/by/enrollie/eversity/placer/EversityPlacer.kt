@@ -22,7 +22,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.channels.BroadcastChannel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.joda.time.DateTime
 import org.slf4j.Logger
@@ -40,7 +39,7 @@ class EversityPlacer(logger: Logger) {
     private var _schoolsByAvailable = true
     private val log: Logger = logger
 
-    val schoolsByStatusChannel = BroadcastChannel<Boolean>(Channel.UNLIMITED)
+    val schoolsByStatusChannel = BroadcastChannel<Boolean>(100)
     var schoolsByAvailability: Boolean = true
         private set
     var nextSchoolsByCheck: DateTime = DateTime.now()

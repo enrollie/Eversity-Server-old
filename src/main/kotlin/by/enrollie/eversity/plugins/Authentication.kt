@@ -26,10 +26,10 @@ fun Application.configureAuthentication() {
                 val token = jwtCredential.payload.getClaim("token").asString()
                 if (userID != null && checkToken(userID, token)) {
                     EversityJWT.instance.logger.debug("Authenticated user with user ID $userID and token $token")
-                    User(userID, getUserType(userID), token)
+                    return@validate User(userID, getUserType(userID), token)
                 } else {
                     EversityJWT.instance.logger.debug("Rejected authentication to user with ID $userID and token $token")
-                    null
+                    return@validate null
                 }
             }
         }

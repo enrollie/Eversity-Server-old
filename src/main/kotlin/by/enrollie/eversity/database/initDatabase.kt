@@ -16,7 +16,10 @@ import java.io.File
 
 fun initXodusDatabase(storeDir: File): TransientEntityStore {
     val models = arrayOf(
-        XodusUser,
+        XodusAbsence,
+        XodusAbsenceReason,
+        XodusAbsenceNotes,
+        XodusAbsenceNoteType,
         XodusAdministrationProfile,
         XodusAppData,
         XodusBaseUserProfile,
@@ -24,8 +27,11 @@ fun initXodusDatabase(storeDir: File): TransientEntityStore {
         XodusClassTimetable,
         XodusParentProfile,
         XodusPupilProfile,
+        XodusSchoolsBy,
         XodusTeacherProfile,
+        XodusTelegramData,
         XodusToken,
+        XodusUser,
         XodusUserType
     )
 

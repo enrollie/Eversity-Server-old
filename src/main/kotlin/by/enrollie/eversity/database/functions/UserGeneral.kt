@@ -54,9 +54,17 @@ fun getAllSchoolsByCredentials(store: TransientEntityStore = DATABASE): List<Pai
  */
 fun recordSchoolsByCredentials(userID: Int, credentials: Pair<String, String>, store: TransientEntityStore = DATABASE) =
     store.transactional {
-        XodusUser.query(XodusUser::id eq userID).first().schoolsByCredentials.first().apply {
-            csrfToken = credentials.first
-            sessionID = credentials.second
+        XodusUser.query(XodusUser::id eq userID).first().schoolsByCredentials.apply {
+            if (this.isEmpty)
+                XodusSchoolsBy.new {
+                    user = XodusUser.query(XodusUser::id eq userID).first()
+                    csrfToken = credentials.first
+                    sessionID = credentials.second
+                }
+            else first().apply {
+                csrfToken = credentials.first
+                sessionID = credentials.second
+            }
         }
     }
 

@@ -11,14 +11,13 @@ import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.*
 import kotlinx.dnq.link.OnDeletePolicy
 import kotlinx.dnq.simple.min
-import kotlinx.dnq.simple.requireIf
 
 class XodusClass(entity: Entity) : XdEntity(entity) {
     companion object : XdNaturalEntityType<XodusClass>()
 
     var id by xdRequiredIntProp { min(0) }
     var classTitle by xdRequiredStringProp { }
-    var isSecondShift by xdBooleanProp { requireIf { true } }
+    var isSecondShift by xdBooleanProp { }
     var classTeacher by xdLink1(XodusTeacherProfile)
     var timetable by xdLink1(
         XodusClassTimetable,

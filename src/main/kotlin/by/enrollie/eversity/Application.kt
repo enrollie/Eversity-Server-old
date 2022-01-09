@@ -21,6 +21,7 @@ import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.routes.*
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
+import com.neitex.SchoolsByParser
 import io.ktor.application.*
 import io.ktor.config.*
 import io.ktor.features.*
@@ -153,6 +154,7 @@ fun Application.module(testing: Boolean = false) {
                 LocalLoginIssuer(mapOf())
             } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
     }
+    SchoolsByParser.setSubdomain(configSubdomainURL!!)
 
     configureAuthentication()
     configureHTTP()

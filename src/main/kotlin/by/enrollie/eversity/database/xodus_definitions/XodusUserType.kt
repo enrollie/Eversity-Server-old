@@ -15,11 +15,11 @@ import kotlinx.dnq.xdRequiredStringProp
 
 class XodusUserType(entity: Entity) : XdEnumEntity(entity) {
     companion object : XdEnumEntityType<XodusUserType>() {
-        val PARENT by enumField { title = "PARENT" }
-        val PUPIL by enumField { title = "PUPIL" }
-        val TEACHER by enumField { title = "TEACHER" }
-        val SOCIAL_TEACHER by enumField { title = "SOCIAL_TEACHER" }
-        val ADMINISTRATION by enumField { title = "ADMINISTRATION" }
+        val PARENT by enumField { title = "Parent" }
+        val PUPIL by enumField { title = "Pupil" }
+        val TEACHER by enumField { title = "Teacher" }
+        val SOCIAL_TEACHER by enumField { title = "Social" }
+        val ADMINISTRATION by enumField { title = "Administration" }
         val SYSTEM by enumField { title = "SYSTEM" }
     }
 

@@ -7,12 +7,10 @@
 
 package by.enrollie.eversity.database.xodus_definitions
 
-import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.AbsenceReason
 import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.*
 import kotlinx.dnq.link.OnDeletePolicy
-import kotlinx.dnq.simple.isAfter
 
 class XodusAbsenceReason(entity: Entity) : XdEnumEntity(entity) {
     companion object : XdEnumEntityType<XodusAbsenceReason>() {
@@ -31,13 +29,7 @@ class XodusAbsenceReason(entity: Entity) : XdEnumEntity(entity) {
 class XodusAbsence(entity: Entity) : XdEntity(entity) {
     companion object : XdNaturalEntityType<XodusAbsence>()
 
-    var date by xdRequiredDateTimeProp {
-        isAfter({
-            DATABASE.transactional {
-                XodusAppData.get().firstInitDate
-            }
-        })
-    }
+    var date by xdRequiredDateTimeProp { }
     var schoolClass by xdLink1(XodusClass, onTargetDelete = OnDeletePolicy.CASCADE)
     var pupil by xdLink0_1(XodusPupilProfile)
     var lessons by xdSetProp<XodusAbsence, Short>()

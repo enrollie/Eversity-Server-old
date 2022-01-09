@@ -40,7 +40,6 @@ fun registerClass(
             this.isSecondShift = isSecondShift
             classTeacher =
                 XodusTeacherProfile.query(XodusTeacherProfile::user.matches(XodusUser::id eq classTeacherID)).first()
-            this.timetable.delete()
             this.timetable = XodusClassTimetable.new {
                 schoolClass = this@findOrNew
                 this.monday = Json.encodeToString(timetable.monday)
