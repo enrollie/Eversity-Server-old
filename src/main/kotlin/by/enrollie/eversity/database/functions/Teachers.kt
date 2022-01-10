@@ -10,6 +10,8 @@ package by.enrollie.eversity.database.functions
 import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.SchoolClass
 import by.enrollie.eversity.data_classes.TwoShiftsTimetable
+import by.enrollie.eversity.database.classesCache
+import by.enrollie.eversity.database.teacherTimetableCache
 import by.enrollie.eversity.database.xodus_definitions.XodusTeacherProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
 import by.enrollie.eversity.database.xodus_definitions.XodusUserType
@@ -25,26 +27,32 @@ import kotlinx.serialization.json.Json
  * @throws NoSuchElementException Thrown, if no user with given user ID and type was found
  */
 fun getTeacherTimetable(userID: Int, store: TransientEntityStore = DATABASE): TwoShiftsTimetable =
-    store.transactional(readonly = true) {
-        val user =
-            XodusUser.query((XodusUser::id eq userID) and ((XodusUser::type eq XodusUserType.TEACHER) or (XodusUser::type eq XodusUserType.ADMINISTRATION)))
-                .first()
-        return@transactional Json.decodeFromString((user.profile.first() as XodusTeacherProfile).timetable)
+    teacherTimetableCache.get(userID) {
+        store.transactional(readonly = true) {
+            val user =
+                XodusUser.query((XodusUser::id eq userID) and ((XodusUser::type eq XodusUserType.TEACHER) or (XodusUser::type eq XodusUserType.ADMINISTRATION)))
+                    .first()
+            return@transactional Json.decodeFromString((user.profile as XodusTeacherProfile).timetable)
+        }
     }
 
 /**
  * Returns teacher's class ID if exists
  */
 fun getTeacherClass(teacherID: Int, store: TransientEntityStore = DATABASE): SchoolClass? =
-    store.transactional(readonly = true) {
-        XodusTeacherProfile.query(XodusTeacherProfile::user.matches(XodusUser::id eq teacherID))
-            .firstOrNull()?.schoolClass?.let {
-                SchoolClass(
-                    it.id,
-                    it.classTitle,
-                    it.isSecondShift,
-                    it.classTeacher.user.id,
-                    it.pupils.toList().toPupilsArray()
-                )
-            }
-    }
+    classesCache.asMap().values.find { it.classTeacherID == teacherID }
+        ?: store.transactional(readonly = true) {
+            val schoolClass = XodusTeacherProfile.query(XodusTeacherProfile::user.matches(XodusUser::id eq teacherID))
+                .firstOrNull()?.schoolClass?.let {
+                    SchoolClass(
+                        it.id,
+                        it.classTitle,
+                        it.isSecondShift,
+                        it.classTeacher.user.id,
+                        it.pupils.toList().toPupilsArray()
+                    )
+                }
+            if (schoolClass != null)
+                classesCache.put(schoolClass.id, schoolClass)
+            schoolClass
+        }

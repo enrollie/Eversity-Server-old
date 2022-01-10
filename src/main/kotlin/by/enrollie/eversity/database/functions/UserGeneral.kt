@@ -8,8 +8,9 @@
 package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.DATABASE
-import by.enrollie.eversity.data_classes.UserName
-import by.enrollie.eversity.data_classes.UserType
+import by.enrollie.eversity.data_classes.*
+import by.enrollie.eversity.database.usersCache
+import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusSchoolsBy
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
 import jetbrains.exodus.database.TransientEntityStore
@@ -20,23 +21,43 @@ import kotlinx.dnq.query.*
  * @param userID ID of user
  * @return true, if user exists. false otherwise
  */
-fun doesUserExist(userID: Int, store: TransientEntityStore = DATABASE): Boolean =
-    store.transactional(readonly = true) { XodusUser.query(XodusUser::id eq userID).any() }
-
-/**
- * Obtains user credentials from database
- *
- * @param userID ID of user to get credentials
- * @return Triple, made of (csrftoken?, sessionid?, APIToken)
- * @throws IllegalArgumentException Thrown, if user is not found
- * @throws NoSuchElementException Thrown, if no credentials were found OR they are outdated (in any of cases, you are required to re-register credentials)
- * @throws IllegalStateException Thrown, if more than two credentials sets have been found
- */
-fun obtainSchoolsByCredentials(userID: Int, store: TransientEntityStore = DATABASE): Pair<String, String> =
-    store.transactional(readonly = true) {
-        val credentials = XodusUser.query(XodusUser::id eq userID).first().schoolsByCredentials.first()
-        return@transactional Pair(credentials.csrfToken, credentials.sessionID)
+fun doesUserExist(userID: Int, store: TransientEntityStore = DATABASE): Boolean {
+    if (usersCache.getIfPresent(userID) != null)
+        return true
+    val user = store.transactional(readonly = true) {
+        XodusUser.query(XodusUser::id eq userID).firstOrNull()?.let {
+            when (it.type.toEnum()) {
+                UserType.Teacher, UserType.Administration -> {
+                    Teacher(it.id, it.firstName, it.middleName, it.lastName)
+                }
+                UserType.Pupil -> {
+                    Pupil(
+                        it.id,
+                        it.firstName,
+                        it.middleName,
+                        it.lastName,
+                        (it.profile as XodusPupilProfile).schoolClass.id
+                    )
+                }
+                UserType.Parent -> {
+                    Parent(it.id, it.firstName, it.middleName, it.lastName)
+                }
+                UserType.SYSTEM, UserType.Social -> {
+                    object : User {
+                        override val id: Int = it.id
+                        override val type: UserType = UserType.SYSTEM
+                        override val firstName: String = it.firstName
+                        override val middleName: String? = it.middleName
+                        override val lastName: String = it.lastName
+                    }
+                }
+            }
+        }
     }
+    if (user != null)
+        usersCache.put(userID, user)
+    return user != null
+}
 
 fun getAllSchoolsByCredentials(store: TransientEntityStore = DATABASE): List<Pair<Int, Pair<String, String>>> =
     store.transactional(readonly = true) {
@@ -73,9 +94,38 @@ fun recordSchoolsByCredentials(userID: Int, credentials: Pair<String, String>, s
  * @param userID User's ID
  * @throws NoSuchElementException Thrown, if user is not registered
  */
-fun getUserType(userID: Int, store: TransientEntityStore = DATABASE): UserType = store.transactional(readonly = true) {
-    XodusUser.query(XodusUser::id eq userID).first().type.toEnum()
-}
+fun getUserType(userID: Int, store: TransientEntityStore = DATABASE): UserType = usersCache.get(userID) {
+    store.transactional(readonly = true) {
+        XodusUser.query(XodusUser::id eq userID).first().let {
+            when (it.type.toEnum()) {
+                UserType.Teacher, UserType.Administration -> {
+                    Teacher(it.id, it.firstName, it.middleName, it.lastName)
+                }
+                UserType.Pupil -> {
+                    Pupil(
+                        it.id,
+                        it.firstName,
+                        it.middleName,
+                        it.lastName,
+                        (it.profile as XodusPupilProfile).schoolClass.id
+                    )
+                }
+                UserType.Parent -> {
+                    Parent(it.id, it.firstName, it.middleName, it.lastName)
+                }
+                UserType.SYSTEM, UserType.Social -> {
+                    object : User {
+                        override val id: Int = it.id
+                        override val type: UserType = UserType.SYSTEM
+                        override val firstName: String = it.firstName
+                        override val middleName: String? = it.middleName
+                        override val lastName: String = it.lastName
+                    }
+                }
+            }
+        }
+    }
+}.type
 
 /**
  * Returns user's full name
@@ -83,10 +133,6 @@ fun getUserType(userID: Int, store: TransientEntityStore = DATABASE): UserType =
  */
 fun getUserName(userID: Int, store: TransientEntityStore = DATABASE): UserName = store.transactional(readonly = true) {
     XodusUser.query(XodusUser::id eq userID).first().packName()
-}
-
-fun removeUser(userID: Int, store: TransientEntityStore = DATABASE) = store.transactional {
-    XodusUser.query(XodusUser::id eq userID).first().delete()
 }
 
 fun deleteSchoolsByCredentials(userID: Int, store: TransientEntityStore = DATABASE) = store.transactional {

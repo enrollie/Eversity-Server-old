@@ -8,14 +8,13 @@
 package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.DATABASE
-import by.enrollie.eversity.database.validTokensSet
+import by.enrollie.eversity.database.tokensCache
 import by.enrollie.eversity.database.xodus_definitions.XodusToken
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
-import by.enrollie.eversity.tokenCacheValidityMinutes
+import by.enrollie.eversity.security.EversityJWT
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 import org.joda.time.DateTime
-import org.joda.time.Minutes
 import java.util.*
 
 /**
@@ -26,12 +25,14 @@ import java.util.*
  */
 fun issueToken(userID: Int, store: TransientEntityStore = DATABASE): String = store.transactional {
     val hashNumber = it.getSequence("tokens").increment()
-    XodusToken.new {
+    val newToken = XodusToken.new {
         token = UUID.nameUUIDFromBytes((hashNumber.toString() + DateTime.now().toString()).toByteArray()).toString()
         issueDate = DateTime.now()
         user = XodusUser.query(XodusUser::id eq userID).first()
         invalid = false
     }.token
+    tokensCache.put(Pair(userID, newToken), true)
+    newToken
 }
 
 /**
@@ -42,6 +43,7 @@ fun issueToken(userID: Int, store: TransientEntityStore = DATABASE): String = st
  */
 fun invalidateAllTokens(userID: Int, store: TransientEntityStore = DATABASE) = store.transactional {
     XodusToken.query(XodusToken::user.matches(XodusUser::id eq userID)).toList().forEach {
+        tokensCache.invalidate(Pair(userID, it.token))
         it.invalid = true
     }
 }
@@ -53,27 +55,21 @@ fun invalidateAllTokens(userID: Int, store: TransientEntityStore = DATABASE) = s
  * @param token Token to check
  * @return If token is found and it is not banned, returns (true, null). If token is found, but it is banned, returns (false, reason of ban). If token is not found, returns (false,null).
  */
-fun checkToken(userID: Int, token: String, store: TransientEntityStore = DATABASE): Boolean {
-    if (validTokensSet.find {
-            it.first == userID && it.second == token && Minutes.minutesBetween(
-                it.third,
-                DateTime.now()
-            ).minutes <= tokenCacheValidityMinutes
-        } != null) {
-        return true
+fun checkToken(userID: Int, token: String, store: TransientEntityStore = DATABASE): Boolean =
+    tokensCache.get(Pair(userID, token)) {
+        store.transactional(readonly = true) {
+            val foundToken =
+                XodusToken.query((XodusToken::user.matches(XodusUser::id eq userID)) and (XodusToken::token eq token))
+                    .firstOrNull()
+            if (foundToken != null) {
+                EversityJWT.instance.logger.debug("Authenticated user with user ID $userID and token $token")
+                return@transactional !foundToken.invalid
+            } else {
+                EversityJWT.instance.logger.debug("Rejected authentication to user with ID $userID and token $token")
+                return@transactional false
+            }
+        }
     }
-    return store.transactional(readonly = true) {
-        val foundToken =
-            XodusToken.query((XodusToken::user.matches(XodusUser::id eq userID)) and (XodusToken::token eq token))
-                .firstOrNull()
-        if (foundToken != null) {
-            if (!foundToken.invalid) {
-                validTokensSet.add(Triple(userID, token, DateTime.now()))
-                return@transactional true
-            } else return@transactional false
-        } else false
-    }
-}
 
 /**
  * Invalidates given user token
@@ -81,7 +77,9 @@ fun checkToken(userID: Int, token: String, store: TransientEntityStore = DATABAS
  * @param token Token to invalidate
  */
 fun invalidateSingleToken(userID: Int, token: String, store: TransientEntityStore = DATABASE) = store.transactional {
-    XodusToken.query((XodusToken::user.matches(XodusUser::id eq userID)) and (XodusToken::token eq token)).firstOrNull()?.apply {
-        invalid = true
-    }
+    tokensCache.invalidate(Pair(userID, token))
+    XodusToken.query((XodusToken::user.matches(XodusUser::id eq userID)) and (XodusToken::token eq token)).firstOrNull()
+        ?.apply {
+            invalid = true
+        }
 }

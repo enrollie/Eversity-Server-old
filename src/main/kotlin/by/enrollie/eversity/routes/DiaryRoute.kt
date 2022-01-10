@@ -150,12 +150,6 @@ fun Route.diaryRoute() {
                         "Class with ID $classID was not found"
                     )
                 }
-                if (user.type == UserType.Teacher) {
-                    return@get call.respond(
-                        HttpStatusCode.Forbidden,
-                        "You cannot access this route"
-                    )
-                }
                 if (user.type == UserType.Parent || user.type == UserType.Pupil)
                     return@get call.respond(
                         HttpStatusCode.Forbidden,
@@ -169,7 +163,7 @@ fun Route.diaryRoute() {
                     map[it] = PupilData(it.id, it.firstName, it.lastName, null, listOf())
                 }
                 data.forEach { absence ->
-                    val temp = map.entries.find { it.key.id == absence.pupilID }?.let {
+                    map.entries.find { it.key.id == absence.pupilID }?.let {
                         it.setValue(
                             it.value.copy(
                                 absenceReason = absence.reason,

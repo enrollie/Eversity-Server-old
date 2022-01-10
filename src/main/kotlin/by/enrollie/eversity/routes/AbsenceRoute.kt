@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.N_Placer
+import by.enrollie.eversity.AbsencePlacer
 import by.enrollie.eversity.data_classes.APIPlaceJob
 import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.data_classes.UserType
@@ -207,7 +207,7 @@ fun Route.absenceRoute() {
                     )
                     placeList += placementJob
                 }
-                N_Placer.postAbsence(placeList.toList())
+                AbsencePlacer.postAbsence(placeList.toList())
                 return@post call.respond(HttpStatusCode.OK)
             }
             get("/statistics/ready") {

@@ -12,7 +12,6 @@ package by.enrollie.eversity
 import by.enrollie.eversity.controllers.LocalLoginIssuer
 import by.enrollie.eversity.data_classes.SchoolNameDeclensions
 import by.enrollie.eversity.database.initXodusDatabase
-import by.enrollie.eversity.database.validTokensSet
 import by.enrollie.eversity.notifier.EversityNotifier
 import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
@@ -36,12 +35,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import org.joda.time.DateTime
-import org.joda.time.Minutes
 import java.io.File
 import java.time.Duration
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 var EVERSITY_PUBLIC_NAME = "Eversity "
     private set
@@ -51,7 +47,7 @@ var EVERSITY_BUILD_DATE = ""
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 lateinit var EversityBot: EversityNotifier
     private set
-lateinit var N_Placer: EversityPlacer //name is taken from my previous project
+lateinit var AbsencePlacer: EversityPlacer
     private set
 lateinit var SchoolsCredentialsChecker: CredentialsChecker
     private set
@@ -78,14 +74,12 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: suspend () ->
     }
 
 var configSubdomainURL: String? = null
-var tokenCacheValidityMinutes: Int = 60
 
 fun main(args: Array<String>): Unit =
     io.ktor.server.netty.EngineMain.main(args)
 
 @Suppress("unused") // Referenced in application.conf
-@JvmOverloads
-fun Application.module(testing: Boolean = false) {
+fun Application.module() {
     install(ContentNegotiation) {
         json()
         gson {}
@@ -127,8 +121,6 @@ fun Application.module(testing: Boolean = false) {
     val secretJWT = this.environment.config.config("jwt").property("secret").getString()
     EversityJWT.initialize(secretJWT)
 
-    tokenCacheValidityMinutes =
-        environment.config.config("eversity").property("tokenCacheLifetime").getString().toInt()
     DATABASE =
         initXodusDatabase(File(environment.config.config("database").property("path").getString(), "eversity-db"))
 
@@ -139,7 +131,7 @@ fun Application.module(testing: Boolean = false) {
 
     SCHOOL_WEBSITE = environment.config.config("school").property("website").getString()
     EversityBot = EversityNotifier(telegramToken)
-    N_Placer = EversityPlacer(org.slf4j.LoggerFactory.getLogger("Eversity"))
+    AbsencePlacer = EversityPlacer(org.slf4j.LoggerFactory.getLogger("Eversity"))
     SchoolsCredentialsChecker =
         CredentialsChecker(
             environment.config.config("eversity").property("autoCredentialsRecheck").getString().toInt(),
@@ -165,19 +157,4 @@ fun Application.module(testing: Boolean = false) {
     registerDiary()
     registerAbsenceRoute()
     registerTeachers()
-
-    CoroutineScope(this.coroutineContext).launchPeriodicAsync(TimeUnit.MINUTES.toMillis(tokenCacheValidityMinutes.toLong())) {
-        //Periodically clears valid tokens cache (to ensure some kind of security)
-        //Periodicity is set by tokenCacheValidityMinutes variable
-        var removedCount = 0
-        validTokensSet.removeIf {
-            if (Minutes.minutesBetween(it.third, DateTime.now()).minutes >= tokenCacheValidityMinutes) {
-                removedCount++
-                true
-            } else
-                false
-        }
-        if (removedCount > 0)
-            log.info("Removed $removedCount tokens from valid tokens cache!")
-    }
 }

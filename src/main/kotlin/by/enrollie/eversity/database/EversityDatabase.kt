@@ -9,25 +9,21 @@
 
 package by.enrollie.eversity.database
 
-import by.enrollie.eversity.data_classes.DayOfWeek
+import by.enrollie.eversity.data_classes.*
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import org.joda.time.DateTime
+import java.time.Duration
 
-/**
- * Temporary cache of valid access tokens.
- */
-var validTokensSet = mutableSetOf<Triple<Int, String, DateTime>>()
-
-/**
- * Validates given dayMap to contain full timetable
- * @param daysMap Map of days
- * @return True, if timetable is valid. False otherwise
- */
-fun validateDaysMap(daysMap: Map<DayOfWeek, Any>): Boolean {
-    if (daysMap.size !in 6..7)
-        return false
-    for (i in 0 until 6) {
-        if (!daysMap.containsKey(DayOfWeek.values()[i]))
-            return false
-    }
-    return true
-}
+val tokensCache: Cache<Pair<UserID, String>, Boolean> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).maximumSize(10000).recordStats().build()
+val usersCache: Cache<UserID, User> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).maximumSize(10000).recordStats().build()
+val classesCache: Cache<ClassID, SchoolClass> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(5)).maximumSize(100).recordStats().build()
+val classesAbsenceCache: Cache<Pair<ClassID, DateTime>, Set<Absence>> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(2)).maximumSize(10000).recordStats().build()
+val classTimetablesCache: Cache<ClassID, Timetable> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(5)).maximumSize(100).recordStats().build()
+val teacherTimetableCache: Cache<UserID, TwoShiftsTimetable> =
+    Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).maximumSize(100).recordStats().build()

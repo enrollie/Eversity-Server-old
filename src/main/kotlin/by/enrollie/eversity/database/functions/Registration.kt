@@ -12,10 +12,12 @@ import by.enrollie.eversity.data_classes.Pupil
 import by.enrollie.eversity.data_classes.Timetable
 import by.enrollie.eversity.data_classes.TwoShiftsTimetable
 import by.enrollie.eversity.data_classes.UserName
+import by.enrollie.eversity.database.classTimetablesCache
 import by.enrollie.eversity.database.xodus_definitions.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.creator.findOrNew
 import kotlinx.dnq.query.*
+import kotlinx.dnq.util.isDefined
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -50,6 +52,7 @@ fun registerClass(
                 this.saturday = Json.encodeToString(timetable.saturday)
             }
         }
+        classTimetablesCache.put(classID, timetable)
         XodusTeacherProfile.query(XodusTeacherProfile::user.matches(XodusUser::id eq classTeacherID))
             .first().schoolClass = newClass
     }
@@ -61,7 +64,7 @@ fun registerClass(
  * (does not register pupils, neither timetables)
  *
  * @param userID User ID of class teacher
- * @param fullName [Triple] First - First name, Second - Middle name, Third - Last name
+ * @param name User's name, packaged in [UserName]
  * @param cookies [Pair] First - csrftoken, second - sessionID
  * @param isAdministration Defines, should user be created with administration rights or not
  *
@@ -114,6 +117,7 @@ fun registerTeacher(
  * @see registerManyPupils
  * @throws NoSuchElementException Thrown, if pupil's class is not yet registered.
  */
+@Suppress("Unused")
 fun registerPupil(
     userID: Int,
     name: UserName,
@@ -127,10 +131,9 @@ fun registerPupil(
             firstName = name.firstName
             middleName = name.middleName
             lastName = name.lastName
+            if (isDefined(XodusUser::profile))
+                profile.delete()
             // Users normally don't have more profiles than one, but to be sure we'll delete everything
-            profile.toList().forEach {
-                delete()
-            }
             XodusPupilProfile.new {
                 user = this@findOrNew
                 schoolClass = XodusClass.query(XodusClass::id eq classID).first()
@@ -156,9 +159,8 @@ fun registerManyPupils(array: Array<Pupil>, store: TransientEntityStore = DATABA
                 middleName = pupil.middleName
                 lastName = pupil.lastName
                 // Users normally don't have more profiles than one, but to be sure we'll delete everything
-                profile.toList().forEach {
-                    delete()
-                }
+                if (isDefined(XodusUser::profile))
+                    profile.delete()
                 XodusPupilProfile.new {
                     user = this@findOrNew
                     schoolClass =
@@ -187,7 +189,7 @@ fun registerParent(
             XodusParentProfile.new {
                 this.pupils
             }
-            cookies?.let { cookies->
+            cookies?.let { cookies ->
                 XodusSchoolsBy.new {
                     user = this@findOrNew
                     csrfToken = cookies.first

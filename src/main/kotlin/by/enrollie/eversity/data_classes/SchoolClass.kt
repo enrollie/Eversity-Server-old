@@ -7,14 +7,9 @@
 
 package by.enrollie.eversity.data_classes
 
-import by.enrollie.eversity.database.xodus_definitions.XodusClass
-import jetbrains.exodus.database.TransientEntityStore
-import kotlinx.dnq.query.eq
-import kotlinx.dnq.query.firstOrNull
-import kotlinx.dnq.query.query
-import kotlinx.dnq.query.toList
 import kotlinx.serialization.Serializable
 
+typealias ClassID = Int
 
 @Serializable
 data class SchoolClass(
@@ -43,15 +38,5 @@ data class SchoolClass(
         result = 31 * result + classTeacherID
         result = 31 * result + pupils.contentHashCode()
         return result
-    }
-
-    companion object {
-        fun getClassByID(store: TransientEntityStore, id: Int) = store.transactional {
-            XodusClass.query(XodusClass::id eq id).firstOrNull()?.let {
-                SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id, it.pupils.toList().map {
-                    Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, it.schoolClass.id)
-                }.toTypedArray())
-            }
-        }
     }
 }

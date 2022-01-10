@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.N_Placer
+import by.enrollie.eversity.AbsencePlacer
 import by.enrollie.eversity.controllers.AuthController
 import by.enrollie.eversity.data_classes.ErrorResponse
 import by.enrollie.eversity.database.functions.invalidateAllTokens
@@ -67,10 +67,10 @@ fun Route.authRoutes() {
             }
         }
         post("/login") {
-            if (!N_Placer.schoolsByAvailability) {
+            if (!AbsencePlacer.schoolsByAvailability) {
                 call.response.headers.append(
                     HttpHeaders.RetryAfter,
-                    Seconds.secondsBetween(DateTime.now(), N_Placer.nextSchoolsByCheck).seconds.toString()
+                    Seconds.secondsBetween(DateTime.now(), AbsencePlacer.nextSchoolsByCheck).seconds.toString()
                 )
                 return@post call.respond(HttpStatusCode.ServiceUnavailable)
             }
@@ -108,7 +108,10 @@ fun Route.authRoutes() {
                         is SchoolsByUnavailable -> {
                             call.response.headers.append(
                                 HttpHeaders.RetryAfter,
-                                Seconds.secondsBetween(DateTime.now(), N_Placer.nextSchoolsByCheck).seconds.toString()
+                                Seconds.secondsBetween(
+                                    DateTime.now(),
+                                    AbsencePlacer.nextSchoolsByCheck
+                                ).seconds.toString()
                             )
                             return@post call.respond(HttpStatusCode.ServiceUnavailable)
                         }

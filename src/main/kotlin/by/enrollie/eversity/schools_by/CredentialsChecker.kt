@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.schools_by
 
-import by.enrollie.eversity.N_Placer
+import by.enrollie.eversity.AbsencePlacer
 import by.enrollie.eversity.database.functions.deleteSchoolsByCredentials
 import by.enrollie.eversity.database.functions.getAllSchoolsByCredentials
 import by.enrollie.eversity.database.functions.invalidateAllTokens
@@ -17,7 +17,6 @@ import com.neitex.SchoolsByParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import org.joda.time.DateTime
 import org.slf4j.Logger
 import java.util.*
@@ -42,12 +41,12 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
         checkerScope = CoroutineScope(Dispatchers.Default)
         checkerFunction = {
             logger.info("Starting Schools.by credentials validity auto-check")
-            if (!N_Placer.schoolsByAvailability) {
+            if (!AbsencePlacer.schoolsByAvailability) {
                 logger.warn("Current Schools.by credentials auto-check will be skipped because Schools.by is unavailable")
             }
             val queue: Queue<Pair<Int, Pair<String, String>>> = LinkedList(getAllSchoolsByCredentials())
             var invalidatedCounter = 0
-            while (queue.isNotEmpty() && N_Placer.schoolsByAvailability) {
+            while (queue.isNotEmpty() && AbsencePlacer.schoolsByAvailability) {
                 val checkingCredentials = queue.poll()
                 val result = SchoolsByParser.AUTH.checkCookies(
                     Credentials(
@@ -64,7 +63,7 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
                 }
             }
             lastCheckRemoved = Pair(DateTime.now(), invalidatedCounter)
-            if (invalidatedCounter != 0 && N_Placer.schoolsByAvailability) {
+            if (invalidatedCounter != 0 && AbsencePlacer.schoolsByAvailability) {
                 logger.info("During regular Schools.by credentials validation Eversity tokens were invalidated for $invalidatedCounter users")
             }
         }
@@ -72,15 +71,5 @@ class CredentialsChecker(periodicity: Int, log: Logger) {
             TimeUnit.MINUTES.toMillis(checkPeriodicity.toLong()),
             action = checkerFunction
         )
-    }
-
-    /**
-     * Cancels ongoing check job and re-starts it
-     */
-    fun forceRecheck() {
-        checkerJob.cancel("Force recheck requested")
-        checkerJob = checkerScope.launchPeriodicAsync(TimeUnit.MINUTES.toMillis(checkPeriodicity.toLong())) {
-            checkerFunction
-        }
     }
 }

@@ -76,8 +76,8 @@ dependencies {
     implementation("org.jetbrains.xodus:xodus-environment:$xodusVersion")
     implementation("org.jetbrains.xodus:xodus-entity-store:$xodusVersion")
     implementation("org.jetbrains.xodus:xodus-vfs:$xodusVersion")
-//    implementation("org.jetbrains.xodus:dnq:1.4.480")
-    implementation("org.jetbrains.xodus-neitex:dnq:dev")
+    implementation("org.jetbrains.xodus-neitex:dnq:0.0.3")
+    implementation("com.github.ben-manes.caffeine:caffeine:3.0.5")
     //----END OF DATABASE DEPENDENCIES
 
     //----REPORT DEPENDENCIES
@@ -107,15 +107,15 @@ dependencies {
             strictly("1.5.2-native-mt")
         }
     }
-    implementation("org.docx4j:docx4j-core:11.2.9") {
+    implementation("org.docx4j:docx4j-core:11.3.2") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("org.docx4j:docx4j-openxml-objects:11.2.9") {
+    implementation("org.docx4j:docx4j-openxml-objects:11.3.2") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("org.docx4j:docx4j-JAXB-MOXy:11.2.9") {
+    implementation("org.docx4j:docx4j-JAXB-MOXy:11.3.2") {
         exclude("log4j")
         exclude("org.slf4j")
     }
