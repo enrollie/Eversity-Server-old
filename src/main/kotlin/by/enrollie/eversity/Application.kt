@@ -26,10 +26,7 @@ import io.ktor.application.*
 import io.ktor.config.*
 import io.ktor.features.*
 import io.ktor.gson.*
-import io.ktor.http.*
 import io.ktor.http.cio.websocket.*
-import io.ktor.response.*
-import io.ktor.routing.*
 import io.ktor.serialization.*
 import io.ktor.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
@@ -47,8 +44,10 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 var EVERSITY_PUBLIC_NAME = "Eversity "
+    private set
 private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
+    private set
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 lateinit var EversityBot: EversityNotifier
     private set
@@ -166,15 +165,6 @@ fun Application.module(testing: Boolean = false) {
     registerDiary()
     registerAbsenceRoute()
     registerTeachers()
-    //TODO: Remove, when web client is done
-    routing {
-        get("/") {
-            return@get call.respondText(
-                status = HttpStatusCode.Locked,
-                text = "Web client is not ready yet. Check for updates on $EVERSITY_WEBSITE!"
-            )
-        }
-    }
 
     CoroutineScope(this.coroutineContext).launchPeriodicAsync(TimeUnit.MINUTES.toMillis(tokenCacheValidityMinutes.toLong())) {
         //Periodically clears valid tokens cache (to ensure some kind of security)

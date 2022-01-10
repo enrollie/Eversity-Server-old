@@ -24,7 +24,7 @@ fun Route.usersRouting() {
     route("/api/") {
         route("user") {
             authenticate("jwt") {
-                get { //TODO: Write OpenAPI docs
+                get {
                     val userJWT =
                         call.authentication.principal<by.enrollie.eversity.security.User>() ?: return@get call.respond(
                             HttpStatusCode.Unauthorized,

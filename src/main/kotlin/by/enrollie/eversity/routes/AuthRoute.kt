@@ -29,6 +29,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.joda.time.DateTime
 import org.joda.time.Seconds
+import org.slf4j.LoggerFactory
 
 fun Route.authRoutes() {
     val authController = AuthController()
@@ -112,6 +113,10 @@ fun Route.authRoutes() {
                             return@post call.respond(HttpStatusCode.ServiceUnavailable)
                         }
                         else -> {
+                            LoggerFactory.getLogger(this@route::class.java).error(
+                                "Exception at logging in user with username $username",
+                                authResult.exceptionOrNull()!!
+                            )
                             return@post call.respond(
                                 HttpStatusCode.InternalServerError,
                                 Json.encodeToString(

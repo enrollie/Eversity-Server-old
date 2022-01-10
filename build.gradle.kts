@@ -98,7 +98,7 @@ dependencies {
     //----OTHER DEPENDENCIES
 //    implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.18.2")
-    implementation("com.neitex:schools_parser:0.0.5")
+    implementation("com.neitex:schools_parser:0.0.7")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
     implementation("team.yi.ktor:ktor-banner:0.2.0")

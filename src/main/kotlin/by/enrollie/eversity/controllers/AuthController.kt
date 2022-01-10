@@ -12,7 +12,6 @@ import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import by.enrollie.eversity.exceptions.NotAllPupilsRegistered
-import by.enrollie.eversity.exceptions.PupilsAreNotAllowedToRegister
 import by.enrollie.eversity.security.EversityJWT
 import com.neitex.SchoolsByParser
 import org.slf4j.Logger
@@ -82,7 +81,8 @@ class AuthController {
                     registerManyPupils(pupilsArray)
                     logger.debug("Registered class \'$pupilSchoolClass\' and it's teacher \'$teacherProfile\'")
                 }
-                return Result.failure(PupilsAreNotAllowedToRegister()) // As no features are available to pupils to use
+                val token = issueToken(userID)
+                return Result.success(EversityJWT.instance.sign(userID.toString(), token))
             }
             UserType.Teacher, UserType.Administration -> {
                 val timetable = SchoolsByParser.TEACHER.getTimetable(userID, credentials)
