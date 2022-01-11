@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.data_classes.UserType
 import by.enrollie.eversity.data_functions.fillClassAbsenceTemplate
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.security.User
@@ -72,7 +72,7 @@ fun Route.classesRoute() {
                         text = "Class with ID $classID was not found in this instance",
                         status = HttpStatusCode.NotFound
                     )
-                val classPupils = getClassPupils(classID)
+                val classPupils = getPupilsInClass(classID)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -89,7 +89,7 @@ fun Route.classesRoute() {
                         text = "Class with ID $classID was not found in this instance",
                         status = HttpStatusCode.NotFound
                     )
-                val absences = getClassAbsence(classID)
+                val absences = getClassAbsence(classID, DateTime.now().withTimeAtStartOfDay())
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -111,8 +111,8 @@ fun Route.classesRoute() {
                     "Authentication failed. Check your token."
                 )
                 when (user.type) {
-                    APIUserType.Parent, APIUserType.Pupil -> return@get call.respond(HttpStatusCode.Forbidden)
-                    APIUserType.Teacher -> {
+                    UserType.Parent, UserType.Pupil -> return@get call.respond(HttpStatusCode.Forbidden)
+                    UserType.Teacher -> {
                         if (getClass(classID).classTeacherID != user.id)
                             return@get call.respond(HttpStatusCode.Forbidden)
                     }
@@ -158,13 +158,13 @@ fun Route.classesRoute() {
                     "Missing date",
                     status = HttpStatusCode.BadRequest
                 )
-                try {
+                val parsedDate = try {
                     val dateFormatter = DateTimeFormat.forPattern("YYYY-MM-dd")
                     dateFormatter.parseDateTime(date)
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText("Malformed date", status = HttpStatusCode.BadRequest)
                 }
-                val absences = getClassAbsence(classID, date)
+                val absences = getClassAbsence(classID, parsedDate)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,
@@ -188,16 +188,15 @@ fun Route.classesRoute() {
                 val dateFormatter = DateTimeFormat.forPattern("YYYY-MM-dd")
                 val startDay: String
                 val endDay: String
-                try {
+                val dateRange = try {
                     var dateTime = dateFormatter.parseDateTime(date)
                     dateTime = dateTime.minusDays(abs(DateTimeConstants.MONDAY - dateTime.dayOfWeek))
-                    startDay = dateTime.toString("YYYY-MM-dd")
-                    dateTime = dateTime.plusDays(6)
-                    endDay = dateTime.toString("YYYY-MM-dd")
+                    val endDate = dateTime.plusDays(6)
+                    Pair(dateTime, endDate)
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText("Malformed date", status = HttpStatusCode.BadRequest)
                 }
-                val absences = getClassAbsence(classID, startDay, endDay)
+                val absences = getClassAbsence(classID, dateRange = dateRange)
                 return@get call.respondText(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.OK,

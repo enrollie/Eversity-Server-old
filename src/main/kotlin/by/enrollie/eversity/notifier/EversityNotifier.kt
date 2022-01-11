@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -56,7 +56,8 @@ class EversityNotifier(telegramToken: String) {
                     update.consume()
                     bot.sendMessage(
                         ChatId.fromId(message.chat.id),
-                        text = properties.getProperty("hello").format(SCHOOL_NAME.location, "WEBSITE PLACEHOLDER") //TODO: Ask for website
+                        text = properties.getProperty("hello")
+                            .format(SCHOOL_NAME.location, "WEBSITE PLACEHOLDER") //TODO: Ask for website
                     )
                 }
                 command("help") {
@@ -77,7 +78,7 @@ class EversityNotifier(telegramToken: String) {
                         )
                         return@text
                     }
-                    insertTelegramNotifyData(foundCode.second.first, foundCode.second.second, message.chat.id)
+                    insertTelegramNotifyData(foundCode.second.first, message.chat.id)
                     bot.sendMessage(ChatId.fromId(message.chat.id), text = properties.getProperty("sync_successful"))
                     telegramPairingCodesList.remove(foundCode)
                 }

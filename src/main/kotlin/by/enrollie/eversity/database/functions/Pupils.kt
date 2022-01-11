@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,58 +7,56 @@
 
 package by.enrollie.eversity.database.functions
 
-import by.enrollie.eversity.data_classes.APIUserType
+import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.Pupil
-import by.enrollie.eversity.database.findCachedPupil
-import by.enrollie.eversity.database.tables.Pupils
-import by.enrollie.eversity.exceptions.UserNotRegistered
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.transactions.transaction
+import by.enrollie.eversity.database.classesCache
+import by.enrollie.eversity.database.xodus_definitions.XodusParentProfile
+import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
+import by.enrollie.eversity.database.xodus_definitions.XodusUser
+import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
+import jetbrains.exodus.database.TransientEntityStore
+import kotlinx.dnq.query.*
 
 /**
  * Returns pupil's class ID
  *
  * @param userID Pupil's ID
  * @return Class ID
- * @throws IllegalArgumentException Thrown, if user is not registered OR is not found in "Pupils" table
+ * @throws IllegalArgumentException Thrown, if user was not found in pupils list
  */
-fun getPupilClass(userID: Int): Int {
-    if (!doesUserExist(userID)) {
-        throw UserNotRegistered("User with ID $userID does not exist")
-    }
-    if (getUserType(userID) != APIUserType.Pupil)
-        throw IllegalArgumentException("User with ID $userID is not a pupil (they are ${getUserType(userID)}, in fact)")
-    val cachedPupil = findCachedPupil(userID)
-    if (cachedPupil != null)
-        return cachedPupil.classID
-    val classIDElement = transaction {
-        Pupils.select {
-            Pupils.id eq userID
-        }.toList().firstOrNull()
-    } ?: throw IllegalArgumentException("Pupil with ID $userID not found in Pupils table.")
-    CoroutineScope(Dispatchers.Default).async {
-        getUserName(
-            userID,
-            APIUserType.Pupil
-        )
-    } //This call will asynchronously cache pupil
-    return classIDElement[Pupils.classID]
+fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): Int = store.transactional(readonly = true) {
+    XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq userID)).firstOrNull()?.schoolClass?.id
+        ?: throw IllegalArgumentException("Pupil with ID $userID does not exist")
 }
 
 /**
- * Retrieves pupil's timetable
- * @param userID ID of pupil
- * @throws IllegalArgumentException Thrown, if pupil is not found in database
+ * Returns all pupils in given class
+ *
+ * @param classID Class ID
+ * @throws NoSuchElementException Thrown, when class with that ID was not found
  */
-fun getPupilTimetable(userID: Int) = getClassTimetable(getPupilClass(userID))
-fun getClassPupils(classID: Int): List<Pupil> {
-    require(doesClassExist(classID)) { "Class with ID $classID does not exist" }
-    return transaction {
-        Pupils.select { Pupils.classID eq classID }.toList().map {
-            Pupil(it[Pupils.id], it[Pupils.firstName], it[Pupils.lastName], it[Pupils.classID])
+fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = classesCache.get(classID) {
+    store.transactional(readonly = true) {
+        getClassInDB(classID)
+    }
+}.pupils
+
+fun getNonExistentPupilsIDs(pupils: List<Pupil>, store: TransientEntityStore = DATABASE) =
+    store.transactional(readonly = true) {
+        XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id inValues pupils.map { it.id })).toList()
+            .toPupilsArray().filter { pupil -> !pupils.map { it.id }.contains(pupil.id) }
+    }
+
+/**
+ * Assigns pupils profiles to parents
+ * @param assignList List of (Pupil ID, Parent ID) pairs
+ */
+fun assignPupilsToParents(assignList: List<Pair<Int, Int>>, store: TransientEntityStore = DATABASE) =
+    store.transactional {
+        for (pair in assignList) {
+            XodusParentProfile.query(XodusParentProfile::user.matches(XodusUser::id eq pair.second))
+                .firstOrNull()?.pupils?.add(
+                    XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq pair.first)).first()
+                )
         }
     }
-}

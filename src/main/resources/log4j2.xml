@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright © 2021 - 2022.
+  ~ Author: Pavel Matusevich.
+  ~ Licensed under GNU AGPLv3.
+  ~ All rights are reserved.
+  -->
+
 <Configuration status="warn">
     <Properties>
         <Property name="archivePath">.eversity-archive-logs</Property>

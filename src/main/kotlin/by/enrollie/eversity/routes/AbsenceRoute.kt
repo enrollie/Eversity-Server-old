@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,24 +7,20 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.N_Placer
+import by.enrollie.eversity.AbsencePlacer
 import by.enrollie.eversity.data_classes.APIPlaceJob
-import by.enrollie.eversity.data_classes.APIUserType
 import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.data_classes.UserType
 import by.enrollie.eversity.data_functions.fillAbsenceTemplate
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.placer.data_classes.PlaceJob
-import by.enrollie.eversity.placer.data_classes.PlacingStatus
-import by.enrollie.eversity.plugins.authenticateWithJWT
 import by.enrollie.eversity.security.User
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
-import io.ktor.http.cio.websocket.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
-import io.ktor.websocket.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
@@ -36,202 +32,12 @@ import org.joda.time.IllegalFieldValueException
 import org.joda.time.format.DateTimeFormat
 import java.text.SimpleDateFormat
 import java.util.*
-import javax.security.auth.login.CredentialException
 
 
 @Serializable
 private data class ClassData(val classID: Int, val className: String, val isSecondShift: Boolean)
 
 fun Route.absenceRoute() {
-    route("/wsapi/absence") {
-        webSocket("/statistics/ready") {
-            kotlin.run {
-                var authData = incoming.receive()
-                while (authData !is Frame.Text) {
-                    authData = incoming.receive()
-                }
-                val authToken = authData.readText().replace("\n", "") //Replace added to be used with websocat tool
-                val user = authenticateWithJWT(authToken)
-                    ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NOT AUTHORIZED"))
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
-                    return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "FORBIDDEN"))
-            }
-            send("OK")
-            for (frame in incoming) {
-                when (frame) {
-                    is Frame.Text -> {
-                        when (frame.readText()) {
-                            "BYE", "BYE\n", "bye" -> {
-                                close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
-                            }
-                            "CHECK", "CHECK\n", "READY?", "READY" -> {
-                                val noDataClasses = getNoAbsenceDataClasses()
-                                send(
-                                    Json.encodeToString(
-                                        mapOf(
-                                            "isReady" to Json.encodeToJsonElement(
-                                                noDataClasses.isEmpty()
-                                            ), "noData" to Json.encodeToJsonElement(noDataClasses.map {
-                                                ClassData(it.first, it.second, it.third)
-                                            })
-                                        )
-                                    )
-                                )
-                            }
-                            else -> {
-                                send("BAD CONTENT")
-                            }
-                        }
-                    }
-                    is Frame.Close -> {
-                        close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
-                    }
-                }
-            }
-        }
-        webSocket("/statistics") {
-            kotlin.run {
-                var authData = incoming.receive()
-                while (authData !is Frame.Text) {
-                    authData = incoming.receive()
-                }
-                val authToken =
-                    (authData as Frame.Text).readText().replace("\n", "") //Replace added to be used with websocat tool
-                val user = authenticateWithJWT(authToken)
-                    ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NOT AUTHORIZED"))
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
-                    return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "FORBIDDEN"))
-            }
-            send("OK")
-            for (frame in incoming) {
-                when (frame) {
-                    is Frame.Text -> {
-                        when (frame.readText()) {
-                            "BYE", "BYE\n", "bye" -> {
-                                close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
-                            }
-                            "CHECK", "CHECK\n", "READY?", "READY" -> {
-                                val pupilCount = countPupils()
-                                val absenceStatistics = getAbsenceStatistics()
-                                send(
-                                    Json.encodeToString(
-                                        mapOf(
-                                            "pupilCount" to Json.encodeToJsonElement(pupilCount),
-                                            "absenceStatistics" to Json.encodeToJsonElement(absenceStatistics)
-                                        )
-                                    )
-                                )
-                            }
-                            else -> {
-                                send("BAD CONTENT")
-                            }
-                        }
-                    }
-                    is Frame.Close -> {
-                        close(CloseReason(CloseReason.Codes.NORMAL, "Bye."))
-                    }
-                }
-            }
-        }
-        webSocket("/subscribe/jobs") {
-            var subscribedID: String? = null
-            var isGroupJob = false
-            for (frame in incoming) {
-                if (subscribedID != null) {
-                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS ALREADY SET"))
-                }
-                when (frame) {
-                    is Frame.Text -> {
-                        val receivedID = frame.readText()
-                        if (subscribedID != null) {
-                            send("JOB SUBSCRIPTION IS ALREADY SENT")
-                            continue
-                        }
-                        subscribedID = receivedID.removeSuffix("\n")
-                        if (subscribedID != "all" && !N_Placer.checkIfJobExists(subscribedID)) {
-                            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "NO SUCH JOB ID WERE FOUND"))
-                            return@webSocket
-                        }
-                        if (subscribedID.startsWith("jb")) {
-                            val doneJob = N_Placer.checkJobStatus(subscribedID)
-                            if (doneJob == PlacingStatus.DONE || doneJob == PlacingStatus.ERROR) {
-                                send(Json.encodeToString(Pair(subscribedID, doneJob)))
-                                close(
-                                    CloseReason(
-                                        CloseReason.Codes.NORMAL,
-                                        "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
-                                    )
-                                )
-                                return@webSocket
-                            }
-                            if (doneJob == PlacingStatus.RUNNING)
-                                send(Json.encodeToString(Pair(subscribedID, doneJob)))
-                        } else if (subscribedID.startsWith("gr")) {
-                            isGroupJob = true
-                            val doneJobs = N_Placer.checkJobGroupStatus(subscribedID)
-                            for (job in doneJobs.filter { it.value == PlacingStatus.RUNNING }) {
-                                send(Json.encodeToString(job.toPair()))
-                            }
-                            for (job in doneJobs.filter { it.value == PlacingStatus.ERROR || it.value == PlacingStatus.DONE }) {
-                                send(Json.encodeToString(job.toPair()))
-                            }
-                            if (doneJobs.count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == doneJobs.size) {
-                                close(
-                                    CloseReason(
-                                        CloseReason.Codes.NORMAL,
-                                        "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
-                                    )
-                                )
-                            }
-                        } else {
-                            if (subscribedID != "all")
-                                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "JOB ID IS MALFORMED"))
-                        }
-                        send("OK")
-                        val channel = N_Placer.jobsStatusBroadcast.openSubscription()
-                        var received: Pair<String, PlacingStatus>
-                        while (true) {
-                            received = channel.receive()
-                            if (subscribedID == "all") {
-                                send(Json.encodeToString(received))
-                                continue
-                            }
-                            if (isGroupJob) {
-                                val jobsID = N_Placer.getGroupJobs(subscribedID)
-                                if (jobsID.contains(received.first)) {
-                                    send(Json.encodeToString(received))
-                                }
-                                if (N_Placer.checkJobGroupStatus(subscribedID)
-                                        .count { it.value == PlacingStatus.DONE || it.value == PlacingStatus.ERROR } == jobsID.size
-                                ) {
-                                    close(
-                                        CloseReason(
-                                            CloseReason.Codes.NORMAL,
-                                            "ALL JOBS ARE DONE. NO FURTHER DATA IS AVAILABLE"
-                                        )
-                                    )
-                                    channel.cancel()
-                                    break
-                                }
-                            } else if (received.first == subscribedID) {
-                                send(Json.encodeToString(received))
-                                if (received.second == PlacingStatus.DONE || received.second == PlacingStatus.ERROR) {
-                                    close(
-                                        CloseReason(
-                                            CloseReason.Codes.NORMAL,
-                                            "JOB IS DONE. NO FURTHER DATA IS AVAILABLE"
-                                        )
-                                    )
-                                    break
-                                }
-                            }
-                        }
-                        channel.cancel()
-                    }
-                }
-            }
-        }
-    }
     authenticate("jwt") {
         route("/api/absence") {
             get("/statistics") {
@@ -239,7 +45,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
+                if (user.type != UserType.Social && user.type != UserType.Administration)
                     return@get call.respondText(
                         text = Json.encodeToString(
                             mapOf(
@@ -249,7 +55,7 @@ fun Route.absenceRoute() {
                         )
                     )
                 val pupilCount = countPupils()
-                val absenceStatistics = getAbsenceStatistics()
+                val absenceStatistics = getAbsenceStatistics(DateTime.now().withTimeAtStartOfDay())
                 return@get call.respondText(
                     text = Json.encodeToString(
                         mapOf(
@@ -264,7 +70,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration)
+                if (user.type != UserType.Social && user.type != UserType.Administration)
                     return@get call.respondText(
                         text = Json.encodeToString(
                             mapOf(
@@ -301,7 +107,7 @@ fun Route.absenceRoute() {
                     "Missing or malformed class ID",
                     status = HttpStatusCode.BadRequest
                 )
-                if (user.type == APIUserType.Parent || user.type == APIUserType.Pupil) {
+                if (user.type == UserType.Parent || user.type == UserType.Pupil) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to post absence")
                     return@post call.respondText(
                         text = Json.encodeToString(
@@ -310,28 +116,6 @@ fun Route.absenceRoute() {
                                 "action" to "NOTHING"
                             )
                         ), status = HttpStatusCode.Forbidden
-                    )
-                }
-                try {
-                    if (user.type == APIUserType.Teacher) {
-                        if (!validateTeacherWriteAccessToClass(user.id, classID))
-                            return@post call.respondText(
-                                text = Json.encodeToString(
-                                    mapOf(
-                                        "errorCode" to "UNAUTHORIZED_ACTION",
-                                        "action" to "NOTHING"
-                                    )
-                                ), status = HttpStatusCode.Forbidden
-                            )
-                    }
-                } catch (e: IllegalArgumentException) {
-                    return@post call.respondText(
-                        text = Json.encodeToString(
-                            mapOf(
-                                "errorCode" to "CLASS_DOES_NOT_EXIST",
-                                "action" to "REVIEW_REQUEST"
-                            )
-                        ), status = HttpStatusCode.BadRequest
                     )
                 }
                 val absenceJob: Array<APIPlaceJob>
@@ -368,12 +152,12 @@ fun Route.absenceRoute() {
                         ), status = HttpStatusCode.BadRequest
                     )
                 }
-                if (absenceJob.filter { if (it.pupilID != -1) getUserType(it.pupilID) == APIUserType.Pupil else true }.size != absenceJob.size) {
+                if (absenceJob.filter { if (it.pupilID != -1) getUserType(it.pupilID) == UserType.Pupil else true }.size != absenceJob.size) {
                     return@post call.respondText(
                         text = Json.encodeToString(
                             mapOf(
                                 "errorCode" to "NOT_ALL_USER_ID_MATCH_PUPIL_TYPE",
-                                "action" to "REVIEW_REQUEST"
+                                "additionalInfo" to "REVIEW_REQUEST"
                             )
                         ), status = HttpStatusCode.BadRequest
                     )
@@ -385,7 +169,7 @@ fun Route.absenceRoute() {
                                 text = Json.encodeToString(
                                     mapOf(
                                         "errorCode" to "ABSENCE_POST_SUNDAY",
-                                        "action" to "REVIEW_REQUEST"
+                                        "additionalInfo" to "REVIEW_REQUEST"
                                     )
                                 ), status = HttpStatusCode.BadRequest
                             )
@@ -396,7 +180,7 @@ fun Route.absenceRoute() {
                         text = Json.encodeToString(
                             mapOf(
                                 "errorCode" to "MALFORMED_DATE",
-                                "action" to "REVIEW_REQUEST"
+                                "additionalInfo" to "REVIEW_REQUEST"
                             )
                         ), status = HttpStatusCode.BadRequest
                     )
@@ -410,111 +194,28 @@ fun Route.absenceRoute() {
                         ), status = HttpStatusCode.BadRequest
                     )
                 }
-                val statusID: String = if (absenceJob.size == 1) {
-                    val name = getUserName(absenceJob[0].pupilID, APIUserType.Pupil)
-                    val credentials = try {
-                        obtainCredentials(user.id)
-                    } catch (e: NoSuchElementException) {
-                        invalidateAllTokens(user.id, "INVALID_COOKIES")
-                        return@post call.respondText(
-                            text = Json.encodeToString(
-                                mapOf(
-                                    "errorCode" to "INVALID_CREDENTIALS",
-                                    "action" to "INVALIDATE_ALL_TOKENS"
-                                )
-                            ), status = HttpStatusCode.PreconditionFailed
-                        )
-                    }
-                    if (credentials.first == null || credentials.second == null) {
-                        invalidateAllTokens(user.id, "INVALID_COOKIES")
-                        return@post call.respondText(
-                            text = Json.encodeToString(
-                                mapOf(
-                                    "errorCode" to "INVALID_CREDENTIALS",
-                                    "action" to "INVALIDATE_ALL_TOKENS"
-                                )
-                            ), status = HttpStatusCode.PreconditionFailed
-                        )
-                    }
+                val placeList = mutableSetOf<PlaceJob>()
+                for (absence in absenceJob) {
+                    val name = getUserName(absence.pupilID)
                     val placementJob = PlaceJob(
-                        Pupil(absenceJob[0].pupilID, name.first, name.third, classID),
-                        absenceJob[0].absenceList,
-                        absenceJob[0].reason,
-                        Pair(
-                            Pair(credentials.first!!, credentials.second!!), credentials.third
-                        ), absenceJob[0].date
+                        Pupil(absence.pupilID, name.firstName, name.middleName, name.lastName, classID),
+                        absence.absenceList,
+                        user.id,
+                        absence.reason,
+                        DateTime.parse(absence.date).withTimeAtStartOfDay(),
+                        null // TODO: Add parsing of additional notes
                     )
-                    try {
-                        N_Placer.addPlacementJob(placementJob)
-                    } catch (e: CredentialException) {
-                        invalidateAllTokens(user.id, "INVALID_COOKIES")
-                        return@post call.respond(
-                            HttpStatusCode.PreconditionFailed,
-                            Json.encodeToJsonElement(
-                                mapOf(
-                                    "errorCode" to "INVALID_COOKIES",
-                                    "action" to "INVALIDATE_ALL_TOKENS"
-                                )
-                            )
-                        )
-                    }
-                } else {
-                    val placeList = mutableSetOf<PlaceJob>()
-                    for (absence in absenceJob) {
-                        val name = getUserName(absence.pupilID, APIUserType.Pupil)
-                        val credentials = obtainCredentials(user.id)
-                        if (credentials.first == null || credentials.second == null) {
-                            invalidateAllTokens(user.id, "INVALID_CREDENTIALS")
-                            return@post call.respondText(
-                                text = Json.encodeToString(
-                                    mapOf(
-                                        "errorCode" to "INVALID_CREDENTIALS",
-                                        "action" to "INVALIDATE_ALL_TOKENS"
-                                    )
-                                ), status = HttpStatusCode.PreconditionFailed
-                            )
-                        }
-                        val placementJob = PlaceJob(
-                            Pupil(absence.pupilID, name.first, name.third, classID),
-                            absence.absenceList,
-                            absence.reason,
-                            Pair(
-                                Pair(credentials.first!!, credentials.second!!), credentials.third
-                            ), absence.date
-                        )
-                        placeList += placementJob
-                    }
-                    try {
-                        N_Placer.batchPlacementJobs(placeList.toList())
-                    } catch (e: CredentialException) {
-                        invalidateAllTokens(user.id, "INVALID_COOKIES")
-                        return@post call.respond(
-                            HttpStatusCode.PreconditionFailed,
-                            Json.encodeToJsonElement(
-                                mapOf(
-                                    "errorCode" to "INVALID_COOKIES",
-                                    "action" to "INVALIDATE_ALL_TOKENS"
-                                )
-                            )
-                        )
-                    }
+                    placeList += placementJob
                 }
-                return@post call.respondText(
-                    text = Json.encodeToString(
-                        mapOf(
-                            "type" to if (statusID.startsWith("gr")) "group" else "single",
-                            "ID" to statusID
-                        )
-                    ),
-                    status = HttpStatusCode.OK
-                )
+                AbsencePlacer.postAbsence(placeList.toList())
+                return@post call.respond(HttpStatusCode.OK)
             }
             get("/statistics/ready") {
                 val user = call.authentication.principal<User>() ?: return@get call.respond(
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
+                if (user.type != UserType.Social && user.type != UserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -525,14 +226,14 @@ fun Route.absenceRoute() {
                         ), status = HttpStatusCode.Forbidden
                     )
                 }
-                val noDataClasses = getNoAbsenceDataClasses()
+                val noDataClasses = getNoAbsenceDataClasses(DateTime.now().withTimeAtStartOfDay())
                 return@get call.respondText(
                     text = Json.encodeToString(
                         mapOf(
                             "isReady" to Json.encodeToJsonElement(
                                 noDataClasses.isEmpty()
                             ), "noData" to Json.encodeToJsonElement(noDataClasses.map {
-                                ClassData(it.first, it.second, it.third)
+                                ClassData(it.id, it.title, it.isSecondShift)
                             })
                         )
                     )
@@ -543,7 +244,7 @@ fun Route.absenceRoute() {
                     HttpStatusCode.Unauthorized,
                     "Authentication failed. Check your token."
                 )
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
+                if (user.type != UserType.Social && user.type != UserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -554,7 +255,7 @@ fun Route.absenceRoute() {
                         ), status = HttpStatusCode.Forbidden
                     )
                 }
-                val absenceData = getAbsenceStatistics()
+                val absenceData = getAbsenceStatistics(DateTime.now().withTimeAtStartOfDay())
                 val pupilCount = countPupils()
                 val filledTemplate = fillAbsenceTemplate(
                     absenceData,
@@ -586,7 +287,7 @@ fun Route.absenceRoute() {
                 } catch (e: IllegalArgumentException) {
                     return@get call.respondText(text = "Malformed date. Reminder: required date format: YYYY-MM-dd")
                 }
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
+                if (user.type != UserType.Social && user.type != UserType.Administration) {
                     this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
                     return@get call.respondText(
                         text = Json.encodeToString(
@@ -614,25 +315,6 @@ fun Route.absenceRoute() {
                 )
                 call.respondFile(filledTemplate)
                 filledTemplate.deleteOnExit()
-            }
-            get("/statistics/perClass") {
-                val user = call.authentication.principal<User>() ?: return@get call.respond(
-                    HttpStatusCode.Unauthorized,
-                    "Authentication failed. Check your token."
-                )
-                if (user.type != APIUserType.Social && user.type != APIUserType.Administration) {
-                    this.application.log.info("User with ID ${user.id} and type ${user.type} tried to access absence route")
-                    return@get call.respondText(
-                        text = Json.encodeToString(
-                            mapOf(
-                                "errorCode" to "ACTION_IS_UNAUTHORIZED",
-                                "action" to "NOTHING"
-                            )
-                        ), status = HttpStatusCode.Forbidden
-                    )
-                }
-                val data = getSchoolStatistics()
-                return@get call.respond(Json.encodeToString(data))
             }
         }
     }

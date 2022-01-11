@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,12 +7,10 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.data_classes.APIUserType
-import by.enrollie.eversity.database.functions.doesUserExist
+import by.enrollie.eversity.data_classes.UserType
+import by.enrollie.eversity.database.functions.getParentsPupils
 import by.enrollie.eversity.database.functions.getUserType
-import by.enrollie.eversity.database.functions.obtainCredentials
 import by.enrollie.eversity.database.functions.removeTelegramNotifyData
-import by.enrollie.eversity.schools_by.SchoolsWebWrapper
 import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.http.*
@@ -30,7 +28,7 @@ import org.joda.time.Minutes
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
-val telegramPairingCodesList = mutableListOf<Pair<Short, Triple<Int, List<Int>, DateTime>>>()
+val telegramPairingCodesList = mutableListOf<Pair<Short, Pair<Int, DateTime>>>()
 
 private val random = Random("Eversity".hashCode())
 
@@ -46,10 +44,10 @@ fun Route.telegramRoute() {
                     )
                 if (telegramPairingCodesList.find { it.second.first == userJWT.id } != null) {
                     val existingCode = telegramPairingCodesList.find { it.second.first == userJWT.id } ?: Pair(
-                        0,
-                        Triple(0, listOf(), DateTime.parse("1991-01-02"))
+                        -1,
+                        Pair(0, DateTime.parse("1991-01-02"))
                     )
-                    if (Minutes.minutesBetween(existingCode.second.third, DateTime.now()).minutes < 14)
+                    if (Minutes.minutesBetween(existingCode.second.second, DateTime.now()).minutes < 14)
                         return@get call.respond(
                             status = HttpStatusCode.OK,
                             message = Json.encodeToString(
@@ -57,7 +55,7 @@ fun Route.telegramRoute() {
                                     "pairID" to existingCode.first.toString(),
                                     "minutesUntilExpire" to "${
                                         Minutes.minutesBetween(
-                                            existingCode.second.third.minusMinutes(15),
+                                            existingCode.second.second.minusMinutes(15),
                                             DateTime.now()
                                         ).minutes
                                     }"
@@ -66,11 +64,11 @@ fun Route.telegramRoute() {
                         )
                     else {
                         telegramPairingCodesList.removeIf {
-                            Minutes.minutesBetween(it.second.third, DateTime.now()).minutes >= 14
+                            Minutes.minutesBetween(it.second.second, DateTime.now()).minutes >= 14
                         }
                     }
                 }
-                if (getUserType(userJWT.id) != APIUserType.Parent) {
+                if (getUserType(userJWT.id) != UserType.Parent) {
                     return@get call.respondText(
                         contentType = ContentType.Application.Json,
                         status = HttpStatusCode.BadRequest,
@@ -85,32 +83,11 @@ fun Route.telegramRoute() {
                 var newCode = random.nextInt(100, 9999).toShort()
                 if (telegramPairingCodesList.find { it.first == newCode } != null)
                     newCode = random.nextInt(100, 9999).toShort()
-
-                val pupilsList = try {
-                    val creds = obtainCredentials(userJWT.id)
-                    SchoolsWebWrapper(
-                        Pair(
-                            creds.first.toString(),
-                            creds.second.toString()
-                        )
-                    ).singleUse { fetchParentPupils(userJWT.id) }
-                } catch (e: UnknownError) {
-                    return@get call.respondText(
-                        status = HttpStatusCode.FailedDependency,
-                        text = "Exception message: ${e.message}"
-                    )
-                }
-                for (pupil in pupilsList) {
-                    if (!doesUserExist(pupil.id))
-                        return@get call.respondText(
-                            text = "Pupil with ID ${pupil.id} (First name: ${pupil.firstName}; Last name: ${pupil.lastName}) is not yet registered by teacher.",
-                            status = HttpStatusCode.PreconditionFailed
-                        )
-                }
+                val pupils = getParentsPupils(userJWT.id)
                 telegramPairingCodesList.add(
                     Pair(
                         newCode,
-                        Triple(userJWT.id, pupilsList.map { it.id }, DateTime.now())
+                        Pair(userJWT.id, DateTime.now())
                     )
                 )
                 CoroutineScope(Dispatchers.Default).launch {

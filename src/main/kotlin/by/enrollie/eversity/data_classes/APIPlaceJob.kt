@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -13,7 +13,8 @@ import kotlinx.serialization.Serializable
 data class APIPlaceJob(
     val pupilID: Int,
     val classID: Int,
-    val absenceList: List<Pair<Short, Boolean>>,
+    val absenceList: List<Short>,
     val reason: AbsenceReason?,
-    val date: String
+    val date: String,
+    val additionalNotes: AbsenceNote? = null
 )

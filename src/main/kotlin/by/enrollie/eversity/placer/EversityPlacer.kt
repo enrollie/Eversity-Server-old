@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021.
+ * Copyright © 2021 - 2022.
  * Author: Pavel Matusevich.
  * Licensed under GNU AGPLv3.
  * All rights are reserved.
@@ -7,21 +7,27 @@
 
 package by.enrollie.eversity.placer
 
-import by.enrollie.eversity.data_classes.AbsenceReason
-import by.enrollie.eversity.database.functions.insertAbsence
-import by.enrollie.eversity.exceptions.SchoolsByNotAvailableException
-import by.enrollie.eversity.notifier.EversityNotifier
-import by.enrollie.eversity.notifier.data_classes.NotifyJob
+import by.enrollie.eversity.configSubdomainURL
+import by.enrollie.eversity.data_classes.Absence
+import by.enrollie.eversity.database.functions.insertAbsences
+import by.enrollie.eversity.database.functions.insertDummyAbsence
+import by.enrollie.eversity.launchPeriodicAsync
 import by.enrollie.eversity.placer.data_classes.PlaceJob
-import by.enrollie.eversity.placer.data_classes.PlacingStatus
-import by.enrollie.eversity.schools_by.SchoolsWebWrapper
-import io.ktor.util.*
-import kotlinx.coroutines.*
+import io.ktor.client.*
+import io.ktor.client.features.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.channels.BroadcastChannel
+import kotlinx.coroutines.launch
 import org.joda.time.DateTime
 import org.slf4j.Logger
-import java.util.*
-import javax.security.auth.login.CredentialException
+import org.slf4j.LoggerFactory
+import java.net.UnknownHostException
+import java.util.concurrent.TimeUnit
 
 /**
  * Engine for putting absence data to Schools.by and Eversity database
@@ -32,220 +38,71 @@ class EversityPlacer(logger: Logger) {
 
     private var _schoolsByAvailable = true
     private val log: Logger = logger
-    private val _jobStatuses = mutableMapOf<String, PlacingStatus>()
-    private val _jobGroups = mutableMapOf<String, List<String>>()
 
-    private val supervisorJob = SupervisorJob()
-    private val placerEngine: Job
+    val schoolsByStatusChannel = BroadcastChannel<Boolean>(100)
+    var schoolsByAvailability: Boolean = true
+        private set
+    var nextSchoolsByCheck: DateTime = DateTime.now()
+        private set
 
-    private var queue: Queue<Pair<String, PlaceJob>> = LinkedList() //Placement queue
+    /**
+     * Immediately sets absence to database
+     */
+    fun postAbsence(jobList: List<PlaceJob>) {
+        log.debug(
+            "Placing absence list of size ${jobList.size} and classes ID {${
+                jobList.map { it.pupil.classID }.toSet().joinToString { "$it; " }
+            }}; List hashcode: ${jobList.hashCode()}"
+        )
+        insertAbsences(jobList.filter { it.reason != null }.map {
+            Absence(
+                it.pupil.id,
+                it.pupil.classID,
+                it.postedBy,
+                it.date.withTimeAtStartOfDay(),
+                it.reason!!, it.absenceList, it.additionalNotes
+            )
+        })
+        jobList.filter { it.reason == null }.takeIf { it.isNotEmpty() }?.forEach {
+            insertDummyAbsence(it.pupil.classID, it.date.withTimeAtStartOfDay())
+        }
+        log.debug("Placed absence list of hashcode ${jobList.hashCode()}")
+        sendAbsenceJobToSchoolsBy(jobList)
+    }
 
-    val jobsStatusBroadcast = BroadcastChannel<Pair<String, PlacingStatus>>(100)
+    private fun sendAbsenceJobToSchoolsBy(jobList: List<PlaceJob>) {
+        // NO-OP until there will be some way to post absence to Schools.by
+        // See https://github.com/enrollie/Eversity-Server/issues/1
+    }
 
-    init {
-        placerEngine = CoroutineScope(Dispatchers.Default).launch {
-            while (true) {
-                if (queue.isNotEmpty()) {
-                    if (_schoolsByAvailable) {
-                        val element = queue.poll()
-                        withContext(this.coroutineContext + supervisorJob) {
-                            launch(CoroutineExceptionHandler { _, throwable ->
-                                _jobStatuses[element.first] = PlacingStatus.ERROR
-                                log.error(throwable)
-                            }) {
-                                _jobStatuses[element.first] = PlacingStatus.RUNNING
-                                jobsStatusBroadcast.send(
-                                    Pair(
-                                        element.first,
-                                        _jobStatuses[element.first] ?: PlacingStatus.ERROR
-                                    )
-                                )
-                                val absenceResult = setAbsence(element.second)
-                                if (absenceResult != null) {
-                                    _jobStatuses[element.first] = PlacingStatus.ERROR
-                                } else {
-                                    _jobStatuses[element.first] = PlacingStatus.DONE
-                                }
-                                jobsStatusBroadcast.send(
-                                    Pair(
-                                        element.first,
-                                        _jobStatuses[element.first] ?: PlacingStatus.ERROR
-                                    )
-                                )
-                            }
-                        }
+    private val schoolsByCheckerJob = CoroutineScope(Dispatchers.IO).launch {
+        val logger = LoggerFactory.getLogger("SchoolsByChecker")
+        launchPeriodicAsync(TimeUnit.MINUTES.toMillis(15)) {
+            val availability = try {
+                val response = HttpClient {
+                    this.expectSuccess = false
+                    install(HttpTimeout) {
+                        requestTimeoutMillis = TimeUnit.SECONDS.toMillis(30.toLong())
+                        connectTimeoutMillis = TimeUnit.SECONDS.toMillis(30.toLong())
+                        socketTimeoutMillis = TimeUnit.SECONDS.toMillis(30.toLong())
+                    }
+                }.use {
+                    it.get<HttpResponse> {
+                        url.takeFrom(configSubdomainURL!!)
                     }
                 }
-                delay(150)
+                response.status == HttpStatusCode.OK
+            } catch (e: HttpRequestTimeoutException) {
+                false
+            } catch (e: UnknownHostException) {
+                false
             }
+            logger.debug("Received Schools.by status: $availability")
+            schoolsByStatusChannel.send(availability)
+            if (schoolsByAvailability != availability)
+                logger.info("New Schools.by status set: $availability; Time of status check: ${DateTime.now()}")
+            schoolsByAvailability = availability
+            nextSchoolsByCheck = DateTime.now().plusMinutes(15)
         }
-        placerEngine.invokeOnCompletion {
-            if (it != null) {
-                logger.error(it)
-            }
-        }
-    }
-
-    /**
-     * Sets if Schools.by is available and ready to receive marks
-     * @param available Availability of Schools.by
-     */
-    fun setSchoolsByAvailability(available: Boolean) {
-        if (available != _schoolsByAvailable) log.debug("EversityPlacer: Schools.by availability is set to $available")
-        _schoolsByAvailable = available
-    }
-
-    /**
-     * Gets Schools.by availability
-     */
-    fun getSchoolsByAvailability() = _schoolsByAvailable
-
-    /**
-     * Adds job of placing absence. Before adding job, checks for validity of given credentials
-     * @param job Placing job
-     * @return ID of created job (starts with "jb")
-     * @throws CredentialException Thrown, if given credentials are invalid
-     */
-    suspend fun addPlacementJob(job: PlaceJob): String {
-        if (_schoolsByAvailable && !SchoolsWebWrapper().singleUse { validateCookies(job.credentials.first) }) {
-            log.debug("Credentials of added job are invalid")
-            throw CredentialException("Credentials for job are invalid")
-        } else if (!_schoolsByAvailable) {
-            log.debug("Credential check for absence job skipped as Schools.by is not available")
-        }
-        var generatedUUID = UUID.randomUUID()
-        if (_jobStatuses.containsKey("jb$generatedUUID"))
-            generatedUUID = UUID.randomUUID()
-        _jobStatuses["jb$generatedUUID"] = PlacingStatus.WAITING
-        queue.offer(Pair("jb$generatedUUID", job))
-        return "jb$generatedUUID"
-    }
-
-    /**
-     * Adds list of jobs to adding queue. All of jobs credentials required to be the same.
-     * Returns job group ID (starts with "gr").
-     * @see checkJobGroupStatus
-     * @param jobList Not empty list of placement jobs
-     * @return Jobs group ID (starts with "gr")
-     * @throws IllegalArgumentException Thrown, if job list is empty OR credentials of jobs list are not the same
-     * @throws CredentialException Thrown, if list credentials are invalid
-     */
-    suspend fun batchPlacementJobs(jobList: List<PlaceJob>): String {
-        require(jobList.count { it.credentials == jobList.first().credentials } == jobList.size) { "Job list credentials are not the same" }
-        if (!SchoolsWebWrapper().singleUse { validateCookies(jobList.first().credentials.first) }) {
-            log.debug("Credentials of added job are invalid")
-            throw CredentialException("Credentials for job are invalid")
-        }
-        val jobsID = mutableListOf<String>()
-        jobList.forEach {
-            var generatedUUID = UUID.randomUUID()
-            if (_jobStatuses.containsKey("jb$generatedUUID"))
-                generatedUUID = UUID.randomUUID()
-            _jobStatuses["jb$generatedUUID"] = PlacingStatus.WAITING
-            queue.offer(Pair("jb$generatedUUID", it))
-            jobsID += "jb$generatedUUID"
-        }
-        var generatedUUID = UUID.randomUUID()
-        if (_jobStatuses.containsKey("gr$generatedUUID"))
-            generatedUUID = UUID.randomUUID()
-        _jobGroups["gr$generatedUUID"] = jobsID
-        return "gr$generatedUUID"
-    }
-
-    /**
-     * Checks status of SINGLE job
-     * @see addPlacementJob
-     * @param jobID Job ID starting with "jb"
-     * @return Current status of given job
-     * @throws IllegalArgumentException Thrown, if job with given ID does not exist (also thrown when job ID does not start with "jb", as jobs array does not have other prefixes)
-     */
-    fun checkJobStatus(jobID: String): PlacingStatus {
-        require(_jobStatuses.containsKey(jobID)) { "Job with ID $jobID was not found" }
-        return _jobStatuses.getOrDefault(jobID, PlacingStatus.ERROR)
-    }
-
-    /**
-     * Checks status of group job. Returns PlacingStatus mapped to list of jobs with same status
-     * @see batchPlacementJobs
-     * @param jobGroupID Job group ID (starts with "gr")
-     * @throws IllegalArgumentException Thrown, if job group ID was not found
-     */
-    fun checkJobGroupStatus(jobGroupID: String): Map<String, PlacingStatus> {
-        require(_jobGroups.containsKey(jobGroupID)) { "Group list does not contain group ID $jobGroupID" }
-        val resultMap = mutableMapOf<String, PlacingStatus>()
-        val jobsList = _jobGroups[jobGroupID]!!
-        for (job in jobsList) {
-            val currentJobStatus = checkJobStatus(job)
-            resultMap[job] = currentJobStatus
-        }
-        return resultMap
-    }
-
-    /**
-     * Sets absence to Schools.by and Eversity database
-     * @param placeJob Placement job
-     * @return Exception if thrown or null
-     */
-    private suspend fun setAbsence(placeJob: PlaceJob): Exception? {
-        if (placeJob.pupil.id == -1) {
-            insertAbsence(
-                placeJob.pupil,
-                AbsenceReason.UNKNOWN,
-                DateTime.parse(placeJob.date),
-                placeJob.absenceList
-            )
-            return null
-        }
-//        val credentials = placeJob.credentials
-//        val placer = SchoolsPlacer(credentials.first)
-        var exception: Exception? = null
-        if (!_schoolsByAvailable)
-            exception = SchoolsByNotAvailableException("Schools.by is not available at the start of absence setter")
-//        if (exception == null && !placer.validateCookies(changeInternal = false)) {
-//            exception = CredentialException("Credentials of job from queue are invalid. Pupil: ${placeJob.pupil};")
-//        }
-        if (exception == null) {
-            //Commented out because there is no alternative for Schools.by API
-            //See https://github.com/enrollie/Eversity-Server/issues/1 for more details
-
-            /*
-            val schoolsPlacement =
-                placer.placeAbsence(placeJob.pupil, placeJob.absenceList, credentials.second, placeJob.date)
-            if (schoolsPlacement.first != 0) {
-                log.warn(
-                    "Schools placer failed of placing absence for next lessons: ${
-                        schoolsPlacement.second?.joinToString(
-                            ","
-                        )
-                    }; Pupil: ${placeJob.pupil};"
-                )
-            }
-             */
-        } else {
-            log.warn(
-                "Absence for pupil ${placeJob.pupil} has not been placed to Schools.by, as exception was thrown before beginning of placing (Exception: ${exception.localizedMessage}; Stack trace: ${
-                    exception.stackTrace.joinToString(
-                        "\t\t\n"
-                    )
-                }"
-            )
-        }
-        insertAbsence(placeJob.pupil, placeJob.reason, DateTime.parse(placeJob.date), placeJob.absenceList)
-        if (placeJob.absenceList.contains(Pair(0, true)) || placeJob.absenceList.contains(Pair(1, true))) {
-            EversityNotifier.notifyChannel.send(
-                NotifyJob(
-                    placeJob.pupil,
-                    placeJob.date,
-                    placeJob.absenceList.map { it.first })
-            )
-        }
-        return exception
-    }
-
-    fun checkIfJobExists(jobID: String): Boolean = _jobGroups.containsKey(jobID) || _jobStatuses.containsKey(jobID)
-
-    fun getGroupJobs(groupJobID: String): List<String> {
-        require(_jobGroups.containsKey(groupJobID)) { "Group with ID $groupJobID does not exist" }
-        return _jobGroups[groupJobID]!!
     }
 }
