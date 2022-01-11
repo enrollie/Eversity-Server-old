@@ -16,3 +16,5 @@ interface User {
 }
 
 typealias UserID = Int
+
+fun Int.evaluateToUserID(currentUserID: UserID): UserID = if (this == -1) currentUserID else this

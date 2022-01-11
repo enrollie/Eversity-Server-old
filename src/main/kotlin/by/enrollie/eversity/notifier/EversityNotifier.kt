@@ -8,11 +8,11 @@
 package by.enrollie.eversity.notifier
 
 import by.enrollie.eversity.SCHOOL_NAME
+import by.enrollie.eversity.data_classes.UserID
 import by.enrollie.eversity.database.functions.getTelegramNotifyList
 import by.enrollie.eversity.database.functions.insertTelegramNotifyData
 import by.enrollie.eversity.database.functions.isRegisteredChat
 import by.enrollie.eversity.notifier.data_classes.NotifyJob
-import by.enrollie.eversity.routes.telegramPairingCodesList
 import com.github.kotlintelegrambot.Bot
 import com.github.kotlintelegrambot.bot
 import com.github.kotlintelegrambot.dispatch
@@ -22,10 +22,13 @@ import com.github.kotlintelegrambot.entities.ChatId
 import com.github.kotlintelegrambot.logging.LogLevel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import org.joda.time.DateTime
 import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.*
 
+val telegramPairingCodesList: MutableList<Pair<Short, Pair<UserID, DateTime>>> =
+    mutableListOf() // STOPSHIP: 2022-01-11 Dummy plug
 
 /**
  *

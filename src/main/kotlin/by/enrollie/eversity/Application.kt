@@ -17,15 +17,15 @@ import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
-import by.enrollie.eversity.routes.*
+import by.enrollie.eversity.routes.authRoute
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
 import com.neitex.SchoolsByParser
 import io.ktor.application.*
 import io.ktor.config.*
 import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.cio.websocket.*
+import io.ktor.routing.*
 import io.ktor.serialization.*
 import io.ktor.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
@@ -78,11 +78,16 @@ var configSubdomainURL: String? = null
 fun main(args: Array<String>): Unit =
     io.ktor.server.netty.EngineMain.main(args)
 
+fun Application.registerRoutes() {
+    routing {
+        authRoute()
+    }
+}
+
 @Suppress("unused") // Referenced in application.conf
 fun Application.module() {
     install(ContentNegotiation) {
         json()
-        gson {}
     }
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(1)
@@ -124,7 +129,6 @@ fun Application.module() {
     DATABASE =
         initXodusDatabase(File(environment.config.config("database").property("path").getString(), "eversity-db"))
 
-
     configSubdomainURL = environment.config.config("schools").property("subdomain").getString()
 
     val telegramToken = environment.config.config("telegram").property("botToken").getString()
@@ -149,12 +153,5 @@ fun Application.module() {
 
     configureAuthentication()
     configureHTTP()
-    configurePingRouting()
-    registerClassesRoute()
-    registerTelegramRoute()
-    registerAuthRoute()
-    registerUsersRoute()
-    registerDiary()
-    registerAbsenceRoute()
-    registerTeachers()
+    registerRoutes()
 }

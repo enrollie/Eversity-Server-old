@@ -7,7 +7,6 @@
 
 package by.enrollie.eversity.controllers
 
-import by.enrollie.eversity.LOCAL_ACCOUNT_ISSUER
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
@@ -17,14 +16,14 @@ import com.neitex.SchoolsByParser
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class AuthController {
+object AuthController {
     private val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     /**
      * Registers user and all it's data in database
      * @return Eversity access token
      */
-    suspend fun registerUser(username: String, password: String): Result<String> {
+    private suspend fun registerUser(username: String, password: String): Result<String> {
         logger.debug("Beginning registering process for username \'$username\'...")
         val credentials = SchoolsByParser.AUTH.getLoginCookies(username, password)
             .fold(onSuccess = { it }, onFailure = {
@@ -152,12 +151,7 @@ class AuthController {
         }
     }
 
-    suspend fun loginUser(username: String, password: String): Result<String> {
-        if (username.startsWith("!_Eversity")) {
-            val localAccount = LOCAL_ACCOUNT_ISSUER.getUserID(username, password) ?: throw AuthorizationUnsuccessful()
-            val token = issueToken(localAccount)
-            return Result.success(EversityJWT.instance.sign(localAccount.toString(), token))
-        }
+    suspend fun loginUser(username: String, password: String): Result<Pair<String, UserID>> {
         val credentials = SchoolsByParser.AUTH.getLoginCookies(username, password)
             .fold(onSuccess = { it }, onFailure = {
                 return if (it is com.neitex.AuthorizationUnsuccessful)
@@ -168,10 +162,10 @@ class AuthController {
             .fold(onSuccess = { it }, onFailure = { return Result.failure(it) })
         if (!doesUserExist(userID)) {
             logger.debug("User with ID $userID is not registered, registering from login.")
-            return registerUser(username, password)
+            return registerUser(username, password).map { Pair(it, userID) }
         }
         recordSchoolsByCredentials(userID, Pair(credentials.csrfToken, credentials.sessionID))
         val token = issueToken(userID)
-        return Result.success(EversityJWT.instance.sign(userID.toString(), token))
+        return Result.success(Pair(EversityJWT.instance.sign(userID.toString(), token), userID))
     }
 }

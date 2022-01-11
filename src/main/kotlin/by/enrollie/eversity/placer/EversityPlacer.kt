@@ -24,6 +24,7 @@ import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.launch
 import org.joda.time.DateTime
+import org.joda.time.Seconds
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.UnknownHostException
@@ -42,8 +43,9 @@ class EversityPlacer(logger: Logger) {
     val schoolsByStatusChannel = BroadcastChannel<Boolean>(100)
     var schoolsByAvailability: Boolean = true
         private set
-    var nextSchoolsByCheck: DateTime = DateTime.now()
-        private set
+    private var nextSchoolsByCheck: DateTime = DateTime.now()
+    val nextSchoolsByCheckIn: Seconds
+        get() = Seconds.secondsBetween(DateTime.now(), nextSchoolsByCheck)
 
     /**
      * Immediately sets absence to database
