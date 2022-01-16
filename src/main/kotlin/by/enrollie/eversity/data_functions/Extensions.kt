@@ -5,5 +5,6 @@
  * All rights are reserved.
  */
 
-rootProject.name = "eversity-server"
-include("server-api")
+package by.enrollie.eversity.data_functions
+
+fun <T> Pair<Array<T>, Array<T>>.join() = this.first + this.second

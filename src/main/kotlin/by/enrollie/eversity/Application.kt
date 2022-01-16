@@ -11,15 +11,20 @@ package by.enrollie.eversity
 
 import by.enrollie.eversity.controllers.LocalLoginIssuer
 import by.enrollie.eversity.data_classes.SchoolNameDeclensions
+import by.enrollie.eversity.database.databasePluginInterface
+import by.enrollie.eversity.database.functions.absenceEngineImpl
 import by.enrollie.eversity.database.initXodusDatabase
-import by.enrollie.eversity.notifier.EversityNotifier
 import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.routes.authRoute
+import by.enrollie.eversity.routes.userRoute
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
+import by.enrollie.eversity_plugins.plugin_api.SemVer
+import by.enrollie.eversity_plugins.plugin_api.ServerConfiguration
+import by.enrollie.eversity_plugins.plugin_api.TPIntegration
 import com.neitex.SchoolsByParser
 import io.ktor.application.*
 import io.ktor.config.*
@@ -27,17 +32,22 @@ import io.ktor.features.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.routing.*
 import io.ktor.serialization.*
+import io.ktor.server.netty.*
 import io.ktor.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import java.io.File
+import java.lang.module.ModuleFinder
+import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
+import java.util.stream.Collectors
+import kotlin.io.path.Path
+import kotlin.io.path.createDirectory
+import kotlin.io.path.notExists
 
 var EVERSITY_PUBLIC_NAME = "Eversity "
     private set
@@ -45,8 +55,6 @@ private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
     private set
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
-lateinit var EversityBot: EversityNotifier
-    private set
 lateinit var AbsencePlacer: EversityPlacer
     private set
 lateinit var SchoolsCredentialsChecker: CredentialsChecker
@@ -75,16 +83,19 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: suspend () ->
 
 var configSubdomainURL: String? = null
 
+
 fun main(args: Array<String>): Unit =
-    io.ktor.server.netty.EngineMain.main(args)
+    EngineMain.main(args)
 
 fun Application.registerRoutes() {
     routing {
         authRoute()
+        userRoute()
     }
 }
 
-@Suppress("unused") // Referenced in application.conf
+@Suppress("unused")
+// Referenced in application.conf
 fun Application.module() {
     install(ContentNegotiation) {
         json()
@@ -131,15 +142,12 @@ fun Application.module() {
 
     configSubdomainURL = environment.config.config("schools").property("subdomain").getString()
 
-    val telegramToken = environment.config.config("telegram").property("botToken").getString()
-
     SCHOOL_WEBSITE = environment.config.config("school").property("website").getString()
-    EversityBot = EversityNotifier(telegramToken)
-    AbsencePlacer = EversityPlacer(org.slf4j.LoggerFactory.getLogger("Eversity"))
+    AbsencePlacer = EversityPlacer()
     SchoolsCredentialsChecker =
         CredentialsChecker(
             environment.config.config("eversity").property("autoCredentialsRecheck").getString().toInt(),
-            org.slf4j.LoggerFactory.getLogger("Schools.by")
+            LoggerFactory.getLogger("Schools.by")
         )
     kotlin.run {
         val localFile = File(environment.config.config("eversity").property("localAccountsFilePath").getString())
@@ -148,6 +156,34 @@ fun Application.module() {
                 log.warn("Local accounts file is not available at path \'${localFile.absolutePath}\'! No local accounts will be available")
                 LocalLoginIssuer(mapOf())
             } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
+    }
+    val plugins = run {
+        val pluginsDir = Paths.get("plugins")
+        if (pluginsDir.notExists()) {
+            log.info("Plugins directory not found, creating...")
+            pluginsDir.createDirectory()
+            return@run listOf()
+        }
+        val pluginsFinder = ModuleFinder.of(pluginsDir)
+        val plugins = pluginsFinder.findAll().stream().map { it.descriptor().name() }.collect(Collectors.toList())
+        val pluginsConfiguration = ModuleLayer.boot().configuration().resolve(pluginsFinder, ModuleFinder.of(), plugins)
+        val layer = ModuleLayer
+            .boot()
+            .defineModulesWithOneLoader(pluginsConfiguration, ClassLoader.getSystemClassLoader())
+        ServiceLoader.load(layer, TPIntegration::class.java).toList()
+    }
+    runBlocking {
+        plugins.forEach {
+            log.debug("Initializing plugin with ID \'${it.metadata.id}\'")
+            it.init(
+                ServerConfiguration(
+                    SemVer.parse(
+                        EVERSITY_VERSION.removePrefix("v").replaceAfter("-", "").removeSuffix("-")
+                    ), SCHOOL_WEBSITE, configSubdomainURL!!
+                ),
+                Path("plugins", it.metadata.id), absenceEngineImpl, databasePluginInterface
+            )
+        }
     }
     SchoolsByParser.setSubdomain(configSubdomainURL!!)
 

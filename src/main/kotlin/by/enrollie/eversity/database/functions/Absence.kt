@@ -13,12 +13,40 @@ import by.enrollie.eversity.database.classesAbsenceCache
 import by.enrollie.eversity.database.xodus_definitions.*
 import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Companion.DUMMY
 import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Companion.toAbsenceReason
+import by.enrollie.eversity_plugins.plugin_api.AbsenceData
+import by.enrollie.eversity_plugins.plugin_api.AbsenceEngine
+import by.enrollie.eversity_plugins.plugin_api.AbsenceEngineEventListener
 import jetbrains.exodus.database.TransientEntityStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.dnq.creator.findOrNew
 import kotlinx.dnq.query.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.joda.time.DateTime
+import java.util.*
+
+private val coroutineScope = CoroutineScope(Dispatchers.Main)
+
+private val eventListeners = mutableListOf<AbsenceEngineEventListener>()
+
+private fun MutableList<AbsenceEngineEventListener>.runOnEachAsync(lambda: (AbsenceEngineEventListener) -> Unit) {
+    coroutineScope.launch {
+        this@runOnEachAsync.forEach(lambda)
+    }
+}
+
+val absenceEngineImpl = object : AbsenceEngine {
+    override fun registerEventListener(listener: AbsenceEngineEventListener): String {
+        eventListeners.add(listener)
+        return UUID.nameUUIDFromBytes(listener.hashCode().toString().toByteArray()).toString()
+    }
+
+    override fun deregisterEventListener(id: String) {
+        eventListeners.removeIf { UUID.nameUUIDFromBytes(it.hashCode().toString().toByteArray()).toString() == id }
+    }
+}
 
 /**
  *
@@ -53,10 +81,36 @@ fun insertAbsences(absencesList: List<Absence>, store: TransientEntityStore = DA
                 }
                 reason = absence.reason.toXodusReason()
             }.apply {
-                if (absence.lessonsList.isEmpty())
+                if (absence.lessonsList.isEmpty()) {
+                    eventListeners.runOnEachAsync { eventListener ->
+                        eventListener.onRemove(
+                            AbsenceData(
+                                this.pupil?.user?.id,
+                                absence.classID,
+                                by.enrollie.eversity_plugins.plugin_api.AbsenceReason.valueOf(this.reason.toAbsenceReason().name),
+                                absence.date.withTimeAtStartOfDay(),
+                                absence.sentByID,
+                                absence.lessonsList
+                            )
+                        )
+                    }
                     delete()
-                if (XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq absence.classID) and (XodusAbsence::date eq absence.date.withTimeAtStartOfDay()))).isEmpty)
+                }
+                if (XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq absence.classID) and (XodusAbsence::date eq absence.date.withTimeAtStartOfDay()))).isEmpty) {
+                    eventListeners.runOnEachAsync { eventListener ->
+                        eventListener.onAdd(
+                            AbsenceData(
+                                null,
+                                absence.classID,
+                                by.enrollie.eversity_plugins.plugin_api.AbsenceReason.DUMMY,
+                                absence.date.withTimeAtStartOfDay(),
+                                absence.sentByID,
+                                absence.lessonsList
+                            )
+                        )
+                    }
                     insertEmptyAbsence(absence.classID, absence.date.withTimeAtStartOfDay())
+                }
             }
             classesAbsenceCache.invalidate(Pair(absence.classID, absence.date.withTimeAtStartOfDay()))
         }
@@ -71,6 +125,18 @@ private fun insertEmptyAbsence(classID: Int, date: DateTime) {
         pupil = null
         reason = DUMMY
     }
+    eventListeners.runOnEachAsync {
+        it.onAdd(
+            AbsenceData(
+                null,
+                classID,
+                by.enrollie.eversity_plugins.plugin_api.AbsenceReason.DUMMY,
+                date.withTimeAtStartOfDay(),
+                null,
+                listOf()
+            )
+        )
+    }
 }
 
 /**
@@ -81,7 +147,20 @@ private fun insertEmptyAbsence(classID: Int, date: DateTime) {
 fun removeAbsence(pupil: Pupil, date: DateTime, store: TransientEntityStore = DATABASE) = store.transactional {
     classesAbsenceCache.invalidate(Pair(pupil.classID, date.withTimeAtStartOfDay()))
     XodusAbsence.query((XodusAbsence::pupil.matches(XodusPupilProfile::user.matches(XodusUser::id eq pupil.id))) and (XodusAbsence::date eq date))
-        .firstOrNull()?.delete()
+        .firstOrNull()?.apply {
+            eventListeners.runOnEachAsync {
+                it.onRemove(
+                    AbsenceData(
+                        this.pupil?.user?.id,
+                        schoolClass.id,
+                        by.enrollie.eversity_plugins.plugin_api.AbsenceReason.valueOf(reason.toAbsenceReason().name),
+                        this.date.withTimeAtStartOfDay(),
+                        this.sentBy?.id, this.lessons.toList()
+                    )
+                )
+            }
+            delete()
+        }
     if (XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq pupil.classID)) and (XodusAbsence::date eq date)).isEmpty)
         insertEmptyAbsence(pupil.classID, date)
 }

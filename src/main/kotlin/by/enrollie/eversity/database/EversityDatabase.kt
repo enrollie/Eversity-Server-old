@@ -10,6 +10,7 @@
 package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
+import by.enrollie.eversity_plugins.plugin_api.Database
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import org.joda.time.DateTime
@@ -27,3 +28,11 @@ val classTimetablesCache: Cache<ClassID, Timetable> =
     Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(5)).maximumSize(100).recordStats().build()
 val teacherTimetableCache: Cache<UserID, TwoShiftsTimetable> =
     Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).maximumSize(100).recordStats().build()
+
+val databasePluginInterface = object : Database {
+    override fun getUserInfo(userID: Int): by.enrollie.eversity_plugins.plugin_api.User? {
+        return by.enrollie.eversity.database.functions.getUserInfo(userID)?.let {
+            by.enrollie.eversity_plugins.plugin_api.User(it.id, it.firstName, it.middleName, it.lastName)
+        }
+    }
+}

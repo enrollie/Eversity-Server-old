@@ -29,7 +29,7 @@ fun initXodusDatabase(storeDir: File): TransientEntityStore {
         XodusPupilProfile,
         XodusSchoolsBy,
         XodusTeacherProfile,
-        XodusTelegramData,
+        XodusIntegration,
         XodusToken,
         XodusUser,
         XodusUserType

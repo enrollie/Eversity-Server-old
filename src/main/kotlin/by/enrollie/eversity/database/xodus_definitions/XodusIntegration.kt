@@ -11,11 +11,13 @@ import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.XdEntity
 import kotlinx.dnq.XdNaturalEntityType
 import kotlinx.dnq.xdParent
-import kotlinx.dnq.xdRequiredLongProp
 
-class XodusTelegramData(entity: Entity) : XdEntity(entity) {
-    companion object : XdNaturalEntityType<XodusTelegramData>()
+open class XodusIntegration(entity: Entity) : XdEntity(entity) {
+    companion object : XdNaturalEntityType<XodusIntegration>()
 
-    var parentProfile: XodusParentProfile by xdParent(XodusParentProfile::telegramData)
-    var telegramChatID by xdRequiredLongProp { }
+    var user: XodusUser by xdParent(XodusUser::integrations)
+    open val uuid: String
+        get() = "empty-data"
+    open val publicName: String
+        get() = "Empty integration"
 }

@@ -23,6 +23,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.joda.time.DateTime
 import org.joda.time.DateTimeConstants
+import java.time.DayOfWeek
 
 /**
  * Checks, whether class exists.

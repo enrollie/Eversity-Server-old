@@ -51,6 +51,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":server-api"))
     //----KTOR DEPENDENCIES
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
@@ -96,7 +97,6 @@ dependencies {
 
 
     //----OTHER DEPENDENCIES
-//    implementation("it.skrape:skrapeit-core:1.0.0-alpha8")
     implementation("com.auth0:java-jwt:3.18.2")
     implementation("com.neitex:schools_parser:0.0.7")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
@@ -119,6 +119,8 @@ dependencies {
         exclude("log4j")
         exclude("org.slf4j")
     }
+    implementation("net.swiftzer.semver:semver:1.2.0")
+    implementation("joda-time:joda-time:2.10.13")
     //----END OF OTHER DEPENDENCIES
 
     //----TEST DEPENDENCIES

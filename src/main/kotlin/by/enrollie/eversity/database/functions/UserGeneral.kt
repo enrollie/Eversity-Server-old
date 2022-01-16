@@ -16,14 +16,58 @@ import by.enrollie.eversity.database.xodus_definitions.XodusUser
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 
+private fun getUserData(userID: UserID) = XodusUser.query(XodusUser::id eq userID).firstOrNull()?.let {
+    when (it.type.toEnum()) {
+        UserType.Teacher, UserType.Administration -> {
+            Teacher(it.id, it.firstName, it.middleName, it.lastName)
+        }
+        UserType.Pupil -> {
+            Pupil(
+                it.id,
+                it.firstName,
+                it.middleName,
+                it.lastName,
+                (it.profile as XodusPupilProfile).schoolClass.id
+            )
+        }
+        UserType.Parent -> {
+            Parent(it.id, it.firstName, it.middleName, it.lastName)
+        }
+        UserType.SYSTEM, UserType.Social -> {
+            object : User {
+                override val id: Int = it.id
+                override val type: UserType = UserType.SYSTEM
+                override val firstName: String = it.firstName
+                override val middleName: String? = it.middleName
+                override val lastName: String = it.lastName
+            }
+        }
+    }
+}
+
 /**
  * Checks, whether user exists
  * @param userID ID of user
  * @return true, if user exists. false otherwise
  */
-fun doesUserExist(userID: Int, store: TransientEntityStore = DATABASE): Boolean {
+fun doesUserExist(userID: UserID, store: TransientEntityStore = DATABASE): Boolean {
     if (usersCache.getIfPresent(userID) != null)
         return true
+    val user = store.transactional(readonly = true) {
+        getUserData(userID)
+    }
+    if (user != null)
+        usersCache.put(userID, user)
+    return user != null
+}
+
+/**
+ * Returns user data
+ */
+fun getUserInfo(userID: UserID, store: TransientEntityStore = DATABASE): User? {
+    val cachedUser = usersCache.getIfPresent(userID)
+    if (cachedUser != null)
+        return cachedUser
     val user = store.transactional(readonly = true) {
         XodusUser.query(XodusUser::id eq userID).firstOrNull()?.let {
             when (it.type.toEnum()) {
@@ -56,7 +100,7 @@ fun doesUserExist(userID: Int, store: TransientEntityStore = DATABASE): Boolean 
     }
     if (user != null)
         usersCache.put(userID, user)
-    return user != null
+    return user
 }
 
 fun getAllSchoolsByCredentials(store: TransientEntityStore = DATABASE): List<Pair<Int, Pair<String, String>>> =

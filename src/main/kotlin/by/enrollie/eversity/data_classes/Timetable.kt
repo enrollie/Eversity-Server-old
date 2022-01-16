@@ -8,6 +8,10 @@
 package by.enrollie.eversity.data_classes
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import java.time.DayOfWeek
 
 internal fun Pair<Array<com.neitex.Lesson>, Array<com.neitex.Lesson>>.toLocalPair(): Pair<Array<Lesson>, Array<Lesson>> =
     Pair(this.first.toLessons(), this.second.toLessons())
@@ -129,10 +133,8 @@ class TwoShiftsTimetable {
         }
     }
 
-    operator fun get(day: DayOfWeek): Pair<Array<Lesson>, Array<Lesson>> {
-        require(day != DayOfWeek.SUNDAY)
-        return lessons[day]!!
-    }
+    operator fun get(day: DayOfWeek): Pair<Array<Lesson>, Array<Lesson>> =
+        if (day == DayOfWeek.SUNDAY) Pair(arrayOf(), arrayOf()) else lessons[day]!!
 
     operator fun set(day: DayOfWeek, value: Pair<Array<Lesson>, Array<Lesson>>) {
         require(day != DayOfWeek.SUNDAY)
@@ -151,4 +153,7 @@ class TwoShiftsTimetable {
         get() = lessons[DayOfWeek.FRIDAY]!!
     val saturday: Pair<Array<Lesson>, Array<Lesson>>
         get() = lessons[DayOfWeek.SATURDAY]!!
+
+    val asJsonElement: JsonElement
+        get() = Json.encodeToJsonElement(lessons)
 }

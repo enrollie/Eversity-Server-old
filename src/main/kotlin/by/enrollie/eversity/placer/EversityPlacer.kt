@@ -35,10 +35,10 @@ import java.util.concurrent.TimeUnit
  * @author Pavel Matusevich, a.k.a. Neitex
  */
 @OptIn(ObsoleteCoroutinesApi::class)
-class EversityPlacer(logger: Logger) {
+class EversityPlacer {
 
     private var _schoolsByAvailable = true
-    private val log: Logger = logger
+    private val log: Logger = LoggerFactory.getLogger(this::class.java)
 
     val schoolsByStatusChannel = BroadcastChannel<Boolean>(100)
     var schoolsByAvailability: Boolean = true
