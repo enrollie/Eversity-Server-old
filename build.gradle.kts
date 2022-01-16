@@ -21,10 +21,11 @@ plugins {
     kotlin("jvm") version "1.6.10"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
     id("com.github.johnrengelman.shadow") version "7.0.0"
+    id("io.wusa.semver-git-plugin") version "2.3.7"
 }
 
 group = "by.enrollie.eversity"
-version = getGitVersion()
+version = semver.info.toString().replace(Regex("\\.sha\\.[a-z0-9]{7}"), "")
 application {
     mainClass.set("io.ktor.server.netty.EngineMain")
 }
@@ -156,4 +157,21 @@ tasks.create("stage") {
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
     archiveClassifier.set("uberJar")
+}
+
+semver {
+    snapshotSuffix = "SNAPSHOT" // (default) appended if the commit is without a release tag
+    dirtyMarker = "dirty" // (default) appended if the are uncommitted changes
+    initialVersion = "0.1.0" // (default) initial version in semantic versioning
+    tagPrefix = "" // (default) each project can have its own tags identified by a unique prefix.
+    tagType = io.wusa.TagType.LIGHTWEIGHT
+    branches { // list of branch configurations
+        branch {
+            regex = ".+" // regex for the branch you want to configure, put this one last
+            incrementer = "PATCH_INCREMENTER" // (default) version incrementer
+            formatter = Transformer {
+                "${semver.info.version.major}.${semver.info.version.minor}.${semver.info.version.patch}+build.${semver.info.count}"
+            }
+        }
+    }
 }

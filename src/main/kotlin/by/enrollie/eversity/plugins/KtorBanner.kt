@@ -11,6 +11,7 @@ import by.enrollie.eversity.EVERSITY_PUBLIC_NAME
 import by.enrollie.eversity.EVERSITY_WEBSITE
 import by.enrollie.eversity.main
 import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.rendering.TextStyles
 import com.github.ajalt.mordant.terminal.Terminal
 import io.ktor.application.*
 import team.yi.kfiglet.FigFont
@@ -25,17 +26,34 @@ fun Application.configureBanner() {
             FigFont.loadFigFont(inputStream)
         }
         beforeBanner { banner ->
-            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
+            Terminal().apply {
+                val welcomeMessage = "Welcome to"
+                println(
+                    "".padStart(
+                        (banner.width - welcomeMessage.length) / 2,
+                        ' '
+                    ) + TextColors.brightGreen(welcomeMessage) + "".padStart(
+                        (banner.width - welcomeMessage.length) / 2,
+                        ' '
+                    )
+                )
+                println((TextColors.blue("".padStart(banner.width, '-'))))
+            }
         }
         render {
             Terminal().println(TextColors.red(it.text))
         }
         afterBanner { banner ->
             val title = " $EVERSITY_PUBLIC_NAME "
-            val homepage = " $EVERSITY_WEBSITE "
-            val filling = "".padEnd(banner.width - title.length - homepage.length, ' ')
-            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
-            Terminal().println(TextColors.brightBlue("$title$filling$homepage\n\n"))
+            val homepage = EVERSITY_WEBSITE
+            Terminal().apply {
+                println((TextColors.blue("".padStart(banner.width, '-'))))
+                println(TextColors.blue("Version: ") + TextColors.brightGreen(title))
+                println(TextColors.blue("Server homepage: ") + TextColors.brightGreen(homepage))
+                println()
+                println(TextColors.red(TextStyles.bold("! WARNING !  ") + TextStyles.italic("These logs may contain private information (like access credentials). Please, be careful on who you let to see these logs.")))
+                println()
+            }
         }
     }
 }

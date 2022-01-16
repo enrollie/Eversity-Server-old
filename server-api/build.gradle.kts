@@ -7,11 +7,14 @@
 
 plugins {
     kotlin("jvm")
+    id("io.wusa.semver-git-plugin")
     `maven-publish`
 }
 
+val libraryVersion = semver.info.toString().replace(Regex("\\.sha\\.[a-z0-9]{7}"), "")
+
 group = "by.enrollie.eversity"
-version = parent?.version.toString()
+version = libraryVersion
 
 repositories {
     mavenCentral()
@@ -80,9 +83,13 @@ publishing {
             }
             groupId = "by.enrollie"
             artifactId = "eversity_api"
-            version = "2"
+            version = libraryVersion
 
             from(components["java"])
         }
     }
+}
+
+semver {
+
 }
