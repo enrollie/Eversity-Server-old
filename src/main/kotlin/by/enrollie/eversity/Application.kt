@@ -10,9 +10,8 @@
 package by.enrollie.eversity
 
 import by.enrollie.eversity.controllers.LocalLoginIssuer
+import by.enrollie.eversity.controllers.PluginProvider
 import by.enrollie.eversity.data_classes.SchoolNameDeclensions
-import by.enrollie.eversity.database.databasePluginInterface
-import by.enrollie.eversity.database.functions.absenceEngineImpl
 import by.enrollie.eversity.database.initXodusDatabase
 import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
@@ -45,7 +44,6 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
 import java.util.stream.Collectors
-import kotlin.io.path.Path
 import kotlin.io.path.createDirectory
 import kotlin.io.path.notExists
 
@@ -172,17 +170,16 @@ fun Application.module() {
             .defineModulesWithOneLoader(pluginsConfiguration, ClassLoader.getSystemClassLoader())
         ServiceLoader.load(layer, TPIntegration::class.java).toList()
     }
+    PluginProvider.setPluginServerConfiguration(
+        ServerConfiguration(
+            SemVer.parse(
+                EVERSITY_VERSION.removePrefix("v").replaceAfter("-", "").removeSuffix("-")
+            ), SCHOOL_WEBSITE, configSubdomainURL!!
+        )
+    )
     runBlocking {
         plugins.forEach {
-            log.debug("Initializing plugin with ID \'${it.metadata.id}\'")
-            it.init(
-                ServerConfiguration(
-                    SemVer.parse(
-                        EVERSITY_VERSION.removePrefix("v").replaceAfter("-", "").removeSuffix("-")
-                    ), SCHOOL_WEBSITE, configSubdomainURL!!
-                ),
-                Path("plugins", it.metadata.id), absenceEngineImpl, databasePluginInterface
-            )
+            PluginProvider.registerPlugin(it)
         }
     }
     SchoolsByParser.setSubdomain(configSubdomainURL!!)

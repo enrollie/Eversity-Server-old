@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.routes
 
+import by.enrollie.eversity.controllers.PluginProvider
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.data_functions.join
 import by.enrollie.eversity.database.functions.*
@@ -15,6 +16,7 @@ import io.ktor.application.*
 import io.ktor.auth.*
 import io.ktor.features.*
 import io.ktor.http.*
+import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
 import kotlinx.serialization.Serializable
@@ -168,10 +170,71 @@ private fun Route.userTimetable() {
     }
 }
 
-private fun Route.userIntegrations() {
-    route("/ingerations") {
-        get {
+@Serializable
+private data class IntegrationData(val integrationID: String, val publicName: String, val connected: Boolean)
 
+@Serializable
+private data class IntegrationRequest(val integrationID: String)
+
+private fun Route.userIntegrations() {
+    route("/integrations") {
+        get {
+            val userJWT = call.principal<User>()!!
+            val routeUserID =
+                call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+                    ?: throw ParameterConversionException("userId", "userId")
+            if (userJWT.type != UserType.SYSTEM && routeUserID != userJWT.id)
+                return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
+            val availableIntegrations = PluginProvider.getAvailableIntegrationsForUser(routeUserID)
+            val connectedIntegrations = PluginProvider.getRegisteredIntegrations(routeUserID)
+            call.respond(availableIntegrations.map { integration ->
+                IntegrationData(
+                    integration.metadata.id,
+                    integration.metadata.publicTitle,
+                    connectedIntegrations.find { it.metadata.id == integration.metadata.id } != null
+                )
+            })
+        }
+        put {
+            val integrationRequest = call.receive<IntegrationRequest>()
+            val userJWT = call.principal<User>()!!
+            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+                ?: throw ParameterConversionException("userId", "userId")
+            val availableIntegrations = PluginProvider.getAvailableIntegrationsForUser(userID)
+            if (availableIntegrations.find { it.metadata.id == integrationRequest.integrationID } == null)
+                return@put call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse.integrationNotFound(integrationRequest.integrationID)
+                )
+            if (PluginProvider.getRegisteredIntegrations(userID)
+                    .find { it.metadata.id == integrationRequest.integrationID } != null
+            )
+                return@put call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse.conflict("Integration is already connected")
+                )
+            call.respond(
+                Json.encodeToJsonElement(
+                    PluginProvider.requestRegistration(
+                        userID,
+                        integrationRequest.integrationID
+                    )
+                )
+            )
+        }
+        delete {
+            val integrationRequest = call.receive<IntegrationRequest>()
+            val userJWT = call.principal<User>()!!
+            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+                ?: throw ParameterConversionException("userId", "userId")
+            val integrations = PluginProvider.getRegisteredIntegrations(userID)
+            if (integrations.find { it.metadata.id == integrationRequest.integrationID } == null)
+                return@delete call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse.integrationNotFound(integrationRequest.integrationID)
+                )
+            PluginProvider.requestDeletion(userID, integrationRequest.integrationID)
+            call.respond(HttpStatusCode.OK)
         }
     }
 }
@@ -181,6 +244,7 @@ fun Route.userRoute() {
         authenticate("jwt") {
             usersRoute()
             userTimetable()
+            userIntegrations()
         }
     }
 }
