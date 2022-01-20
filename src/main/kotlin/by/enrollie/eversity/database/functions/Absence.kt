@@ -11,6 +11,7 @@ import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.classesAbsenceCache
 import by.enrollie.eversity.database.xodus_definitions.*
+import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceNoteType.Companion.toEnum
 import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Companion.DUMMY
 import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Companion.toAbsenceReason
 import by.enrollie.eversity.exceptions.SchoolClassConstraintsViolation
@@ -29,7 +30,7 @@ import kotlinx.serialization.encodeToString
 import org.joda.time.DateTime
 import java.util.*
 
-private val coroutineScope = CoroutineScope(Dispatchers.Main)
+private val coroutineScope = CoroutineScope(Dispatchers.Default)
 
 private val eventListeners = mutableListOf<AbsenceEngineEventListener>()
 
@@ -56,6 +57,35 @@ val absenceEngineImpl = object : AbsenceEngine {
 fun insertAbsences(absencesList: List<Absence>, store: TransientEntityStore = DATABASE) =
     store.transactional {
         for (absence in absencesList) {
+            if (absence.lessonsList.isEmpty()) {
+                XodusAbsence.query((XodusAbsence::date eq absence.date.withTimeAtStartOfDay()) and (XodusAbsence::pupil.matches(
+                    XodusPupilProfile::user.matches(XodusUser::id eq absence.pupilID)
+                ))).toList().forEach {
+                    it.delete()
+                }
+                if (XodusAbsence.query((XodusAbsence::date eq absence.date.withTimeAtStartOfDay()) and (XodusAbsence::schoolClass.matches(
+                        XodusClass::id eq absence.classID))).isEmpty
+                ) {
+                    insertEmptyAbsence(absence.classID, absence.date)
+                    eventListeners.runOnEachAsync { eventListener ->
+                        eventListener.onAdd(
+                            AbsenceData(
+                                null,
+                                absence.classID,
+                                by.enrollie.eversity_plugins.plugin_api.AbsenceReason.DUMMY,
+                                absence.date.withTimeAtStartOfDay(),
+                                absence.sentByID,
+                                absence.lessonsList
+                            )
+                        )
+                    }
+                }
+                continue
+            }
+            XodusAbsence.query((XodusAbsence::date eq absence.date.withTimeAtStartOfDay()) and (XodusAbsence::schoolClass.matches(
+                XodusClass::id eq absence.classID)) and (XodusAbsence::pupil eq null)).toList().forEach {
+                it.delete()
+            }
             XodusAbsence.findOrNew(
                 XodusAbsence.query(
                     (XodusAbsence::date eq absence.date.withTimeAtStartOfDay()) and (XodusAbsence::pupil.matches(
@@ -75,7 +105,7 @@ fun insertAbsences(absencesList: List<Absence>, store: TransientEntityStore = DA
                             AbsenceNoteType.TEXT -> XodusAbsenceNoteType.TEXT
                             AbsenceNoteType.ADDITIONAL_DATA -> XodusAbsenceNoteType.ADDITIONAL_DATA
                         }
-                        this.note = AbsenceNoteJSON.encodeToString(note)
+                        this.note = AbsenceNoteJSON.encodeToString(note.note)
                     }
                 }
                 reason = absence.reason.toXodusReason()
@@ -165,9 +195,7 @@ fun removeAbsence(pupil: Pupil, date: DateTime, store: TransientEntityStore = DA
 }
 
 /**
- * Inserts dummy absence to make class look like it sent an absence data
- * @param classID ID of class
- * @param date Dat
+ * Inserts dummy absences to make class look like it sent an absence data
  */
 fun insertDummyAbsences(dummies: List<DummyAbsence>, store: TransientEntityStore = DATABASE) {
     classesAbsenceCache.invalidateAll(dummies.map { Pair(it.classID, it.dateTime.withTimeAtStartOfDay()) })
@@ -207,25 +235,25 @@ fun getClassAbsence(
  * Gets class absence for given day
  */
 fun getClassAbsence(classID: Int, day: DateTime, store: TransientEntityStore = DATABASE): Set<Absence> =
-    classesAbsenceCache.get(
-        Pair(classID, day.withTimeAtStartOfDay())
-    ) {
-        store.transactional(readonly = true) {
-            XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq classID)) and (XodusAbsence::date eq day.withTimeAtStartOfDay()) and (XodusAbsence::pupil ne null))
-                .toList().map {
-                    Absence(
-                        it.pupil!!.user.id,
-                        it.schoolClass.id,
-                        it.sentBy?.id,
-                        it.date,
-                        it.reason.toAbsenceReason(),
-                        it.lessons.toList(),
-                        it.additionalNotes?.let {
-                            AbsenceNoteJSON.decodeFromString(it.note)
-                        })
-                }.toSet()
-        }
+//    classesAbsenceCache.get(
+//        Pair(classID, day.withTimeAtStartOfDay())
+//    ) {
+    store.transactional(readonly = true) {
+        XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq classID)) and (XodusAbsence::date eq day.withTimeAtStartOfDay()) and (XodusAbsence::pupil ne null))
+            .toList().map {
+                Absence(
+                    it.pupil!!.user.id,
+                    it.schoolClass.id,
+                    it.sentBy?.id,
+                    it.date,
+                    it.reason.toAbsenceReason(),
+                    it.lessons.toList(),
+                    it.additionalNotes?.let {
+                        AbsenceNoteWrapper(type = it.noteType.toEnum(), AbsenceNoteJSON.decodeFromString(it.note))
+                    })
+            }.toSet()
     }
+//    }
 
 /**
  * Retrieves absence statistics from database for [date]

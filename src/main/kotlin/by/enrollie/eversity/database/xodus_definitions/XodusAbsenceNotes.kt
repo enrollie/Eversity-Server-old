@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.database.xodus_definitions
 
+import by.enrollie.eversity.data_classes.AbsenceNoteType
 import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.*
 
@@ -14,6 +15,7 @@ class XodusAbsenceNoteType(entity: Entity) : XdEnumEntity(entity) {
     companion object : XdEnumEntityType<XodusAbsenceNoteType>() {
         val TEXT by enumField { title = "TEXT" }
         val ADDITIONAL_DATA by enumField { title = "ADDITIONAL_DATA" }
+        fun XodusAbsenceNoteType.toEnum() = AbsenceNoteType.valueOf(this.title)
     }
 
     var title by xdRequiredStringProp(unique = true) { }

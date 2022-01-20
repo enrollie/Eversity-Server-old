@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.serializers
 
+import by.enrollie.eversity.DATE_FORMAT
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -14,17 +15,16 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.joda.time.DateTime
-import java.text.SimpleDateFormat
-
-private const val parsePattern = "YYYY-MM-dd"
+import org.joda.time.format.DateTimeFormat
 
 class DateTimeSerializer : KSerializer<DateTime> {
-    private val formatter = SimpleDateFormat(parsePattern)
+    private val formatter = DateTimeFormat.forPattern(DATE_FORMAT)
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DateTime", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: DateTime) {
-        encoder.encodeString(value.toString("YYYY-MM-dd"))
+        encoder.encodeString(formatter.print(value))
     }
 
-    override fun deserialize(decoder: Decoder): DateTime = DateTime(formatter.parse(decoder.decodeString()).time)
+    override fun deserialize(decoder: Decoder): DateTime =
+        formatter.parseDateTime(decoder.decodeString()).withTimeAtStartOfDay()
 }

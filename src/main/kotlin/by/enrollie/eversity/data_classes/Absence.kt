@@ -46,11 +46,11 @@ data class AbsenceNoteWrapper(
 interface AbsenceNote
 
 @Serializable
-@SerialName("TextAbsenceNote")
+@SerialName("TEXT")
 data class TextAbsenceNote(val message: String) : AbsenceNote
 
 @Serializable
-@SerialName("DataAbsenceNote")
+@SerialName("ADDITIONAL_DATA")
 data class DataAbsenceNote(
     @SerialName("didLeaveAftermath")
     val leftAftermath: Boolean? = null

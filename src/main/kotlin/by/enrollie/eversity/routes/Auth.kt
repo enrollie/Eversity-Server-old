@@ -102,30 +102,32 @@ private fun Route.tokens() {
 fun Route.authRoute() {
     route("/auth") {
         authLogin()
-        route("/tokens") {
-            tokens()
-        }
-        route("/{userId}/tokens") {
-            get {
-                val user = call.principal<User>()!!
-                if (user.type != UserType.SYSTEM)
-                    return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
-                val userID: UserID =
-                    call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
-                        ?: throw ParameterConversionException("userId", "Int")
-                call.respond(HttpStatusCode.OK, "{\"count\":${getUserTokensCount(userID)}}")
+        authenticate("jwt") {
+            route("/tokens") {
+                tokens()
             }
-            delete {
-                val user = call.principal<User>()!!
-                if (user.type != UserType.SYSTEM)
-                    return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
-                val userID: UserID =
-                    call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
-                        ?: throw ParameterConversionException("userId", "Int")
-                if (!doesUserExist(userID))
-                    return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse.userNotFound(userID))
-                invalidateAllTokens(userID)
-                call.respond(HttpStatusCode.OK)
+            route("/{userId}/tokens") {
+                get {
+                    val user = call.principal<User>()!!
+                    val userID: UserID =
+                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
+                            ?: throw ParameterConversionException("userId", "Int")
+                    if (user.type != UserType.SYSTEM && userID != user.id)
+                        return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
+                    call.respond(HttpStatusCode.OK, "{\"count\":${getUserTokensCount(userID)}}")
+                }
+                delete {
+                    val user = call.principal<User>()!!
+                    val userID: UserID =
+                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
+                            ?: throw ParameterConversionException("userId", "Int")
+                    if (user.type != UserType.SYSTEM && userID != user.id)
+                        return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
+                    if (!doesUserExist(userID))
+                        return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse.userNotFound(userID))
+                    invalidateAllTokens(userID)
+                    call.respond(HttpStatusCode.OK)
+                }
             }
         }
     }

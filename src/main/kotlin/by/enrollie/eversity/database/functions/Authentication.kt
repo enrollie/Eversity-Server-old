@@ -32,6 +32,7 @@ fun issueToken(userID: UserID, store: TransientEntityStore = DATABASE): String =
         user = XodusUser.query(XodusUser::id eq userID).first()
         invalid = false
     }.token
+    EversityJWT.instance.logger.debug("Issued new token for user $userID: $newToken")
     tokensCache.put(Pair(userID, newToken), true)
     newToken
 }
@@ -43,6 +44,7 @@ fun issueToken(userID: UserID, store: TransientEntityStore = DATABASE): String =
  * @throws IllegalArgumentException Thrown, if no user with such ID is registered
  */
 fun invalidateAllTokens(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
+    EversityJWT.instance.logger.debug("Invalidating all tokens for user $userID")
     XodusToken.query(XodusToken::user.matches(XodusUser::id eq userID)).toList().forEach {
         tokensCache.invalidate(Pair(userID, it.token))
         it.invalid = true
@@ -78,6 +80,7 @@ fun checkToken(userID: UserID, token: String, store: TransientEntityStore = DATA
  * @param token Token to invalidate
  */
 fun invalidateSingleToken(userID: UserID, token: String, store: TransientEntityStore = DATABASE) = store.transactional {
+    EversityJWT.instance.logger.debug("Invalidating token $token for user ID $userID")
     tokensCache.invalidate(Pair(userID, token))
     XodusToken.query((XodusToken::user.matches(XodusUser::id eq userID)) and (XodusToken::token eq token)).firstOrNull()
         ?.apply {

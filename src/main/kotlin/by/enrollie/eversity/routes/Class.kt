@@ -8,6 +8,7 @@
 package by.enrollie.eversity.routes
 
 import by.enrollie.eversity.AbsencePlacer
+import by.enrollie.eversity.DATE_FORMAT
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.data_functions.areNulls
 import by.enrollie.eversity.data_functions.tryToParse
@@ -27,8 +28,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import org.joda.time.DateTime
 import org.joda.time.Interval
+import org.joda.time.LocalDate
+import org.joda.time.LocalTime
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.ISODateTimeFormat
 import org.slf4j.LoggerFactory
-import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 
 @Serializable
@@ -43,16 +47,15 @@ private data class ResponseSchoolClass(
 
 private fun Route.classGet() {
     get {
-        val classID =
-            (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
-                ?: throw ParameterConversionException("classId", "classId")
+        val classID = (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
+            ?: throw ParameterConversionException("classId", "classId")
         val classData = getClass(classID)
-        call.respond(
-            ResponseSchoolClass(
-                classID, classData.title, classData.isSecondShift, classData.pupils.size, classData.classTeacherID,
-                getUserName(classData.classTeacherID).fullForm
-            )
-        )
+        call.respond(ResponseSchoolClass(classID,
+            classData.title,
+            classData.isSecondShift,
+            classData.pupils.size,
+            classData.classTeacherID,
+            getUserName(classData.classTeacherID).fullForm))
     }
 }
 
@@ -66,30 +69,19 @@ private fun Route.absence() {
                 (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
                     ?: throw ParameterConversionException("classId", "classId")
             val dates = call.request.queryParameters["startDate"]?.let {
-                val endDate = call.request.queryParameters["endDate"] ?: return@get call.respond(
-                    HttpStatusCode.BadRequest,
-                    ErrorResponse.conditionalMissingRequiredQuery("startDate", "endDate")
-                )
-                val parser = SimpleDateFormat("YYYY-MM-dd")
-                Pair(
-                    parser.tryToParse(it) ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.deserializationFailure("startDate", it)
-                    ),
-                    parser.tryToParse(endDate) ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.deserializationFailure("endDate", endDate)
-                    )
-                )
+                val endDate =
+                    call.request.queryParameters["endDate"] ?: return@get call.respond(HttpStatusCode.BadRequest,
+                        ErrorResponse.conditionalMissingRequiredQuery("startDate", "endDate"))
+                val parser = DateTimeFormat.forPattern(DATE_FORMAT)
+                Pair(parser.tryToParse(it) ?: return@get call.respond(HttpStatusCode.BadRequest,
+                    ErrorResponse.deserializationFailure("startDate", it)),
+                    parser.tryToParse(endDate) ?: return@get call.respond(HttpStatusCode.BadRequest,
+                        ErrorResponse.deserializationFailure("endDate", endDate)))
             } ?: Pair(null, null)
             val absenceData = if (dates.areNulls) {
-                getClassAbsence(classID, DateTime.now().withTimeAtStartOfDay())
+                getClassAbsence(classID, LocalDate.now().toDateTime(LocalTime.MIDNIGHT))
             } else {
-                getClassAbsence(
-                    classID,
-                    Pair(DateTime(dates.first!!.toInstant().epochSecond),
-                        DateTime(dates.second!!.toInstant().epochSecond))
-                )
+                getClassAbsence(classID, Pair(dates.first!!, dates.second!!))
             }
             val classData = getClass(classID)
             call.respond(AbsenceNoteJSON.encodeToJsonElement(classData.pupils.map { pupil ->
@@ -104,25 +96,18 @@ private fun Route.absence() {
             val placeJobs = AbsenceNoteJSON.decodeFromString<List<PlaceJob>>(call.receiveText())
             kotlin.run {
                 for (job in placeJobs) {
-                    if (job.date.dayOfWeek == DayOfWeek.SUNDAY.value)
-                        return@post call.respond(HttpStatusCode.BadRequest,
-                            ErrorResponse.illegalDate(job.date.toString("YYYY-MM-dd")))
+                    if (job.date.dayOfWeek == DayOfWeek.SUNDAY.value) return@post call.respond(HttpStatusCode.BadRequest,
+                        ErrorResponse.illegalDate(job.date.toString(DATE_FORMAT)))
                 }
             }
             val readyAbsence = validateJobsAndConvertToAbsenceData(classID, placeJobs, user.id)
             if (readyAbsence.isFailure) {
                 when (val exception = readyAbsence.exceptionOrNull()!!) {
-                    is SchoolClassConstraintsViolation -> call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.schoolClassViolation(
-                            exception.violatedConstraints.first,
-                            exception.violatedConstraints.second
-                        )
-                    )
-                    is NoSuchElementException -> call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.classNotFound(classID)
-                    )
+                    is SchoolClassConstraintsViolation -> call.respond(HttpStatusCode.BadRequest,
+                        ErrorResponse.schoolClassViolation(exception.violatedConstraints.first,
+                            exception.violatedConstraints.second))
+                    is NoSuchElementException -> call.respond(HttpStatusCode.BadRequest,
+                        ErrorResponse.classNotFound(classID))
                     else -> {
                         LoggerFactory.getLogger(this::class.java)
                             .error("Unknown error at \'post-class-classId-absence\'", exception)
@@ -141,12 +126,11 @@ private fun Route.absenceDate() {
     get("/{date}") {
         val classID = (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
             ?: throw ParameterConversionException("classId", "classId")
-        val date =
-            SimpleDateFormat("YYYY-MM-dd").tryToParse(call.parameters["date"] ?: throw MissingRequestParameterException(
-                "date"))
-                ?: throw ParameterConversionException("date", "date")
+        val date = (DateTimeFormat.forPattern(DATE_FORMAT)
+            .tryToParse(call.parameters["date"] ?: throw MissingRequestParameterException("date"))
+            ?: throw ParameterConversionException("date", "date")).withTimeAtStartOfDay()
 
-        val absenceData = getClassAbsence(classID, DateTime(date.toInstant().epochSecond).withTimeAtStartOfDay())
+        val absenceData = getClassAbsence(classID, date)
         val classData = getClass(classID)
         call.respond(AbsenceNoteJSON.encodeToJsonElement(classData.pupils.map { pupil ->
             AbsencePair(pupil, absenceData.filter { it.pupilID == pupil.id }.toSet())
@@ -155,7 +139,7 @@ private fun Route.absenceDate() {
 }
 
 private fun Route.pupils() {
-    get {
+    get("/pupils") {
         val classID = (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
             ?: throw ParameterConversionException("classId", "classId")
         call.respond(getPupilsInClass(classID))
@@ -175,8 +159,9 @@ private fun Route.timetable() {
                 val classID =
                     (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
                         ?: throw ParameterConversionException("classId", "classId")
-                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value)
-                    return@get call.respond(Pair<Array<Lesson>, Array<Lesson>>(arrayOf(), arrayOf()))
+                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value) return@get call.respond(Pair<Array<Lesson>, Array<Lesson>>(
+                    arrayOf(),
+                    arrayOf()))
                 call.respond(getClassTimetable(classID).toTwoShiftsTimetable(getClass(classID).isSecondShift)[DayOfWeek.of(
                     DateTime.now().dayOfWeek)])
             }
@@ -189,13 +174,14 @@ private fun Route.timetable() {
                     return@get call.respond(Json.encodeToJsonElement<Lesson?>(null))
                 }
                 val lesson = getClassTimetable(classID)[DayOfWeek.of(currTime.dayOfWeek)].find {
-                    Interval(
+                    Interval(DateTime.now()
+                        .withTime(it.schedule.startHour.toInt(), it.schedule.startMinute.toInt(), 0, 0),
                         DateTime.now()
-                            .withTime(it.schedule.startHour.toInt(), it.schedule.startMinute.toInt(), 0, 0),
-                        DateTime.now().withTime(it.schedule.endHour.toInt(), it.schedule.endMinute.toInt(), 0, 0)
-                    ).contains(currTime)
+                            .withTime(it.schedule.endHour.toInt(), it.schedule.endMinute.toInt(), 0, 0)).contains(
+                        currTime)
                 }
-                call.respond(Json.encodeToJsonElement(lesson))
+                call.respond(Json.encodeToJsonElement(mapOf("serverTime" to Json.encodeToJsonElement(DateTime.now()
+                    .toString(ISODateTimeFormat.dateTime())), "lesson" to Json.encodeToJsonElement(lesson))))
             }
 
         }

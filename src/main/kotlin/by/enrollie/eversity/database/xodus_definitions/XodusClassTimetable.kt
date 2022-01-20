@@ -9,16 +9,18 @@ package by.enrollie.eversity.database.xodus_definitions
 
 import by.enrollie.eversity.data_classes.Timetable
 import jetbrains.exodus.entitystore.Entity
-import kotlinx.dnq.XdEntity
-import kotlinx.dnq.XdNaturalEntityType
+import kotlinx.dnq.*
 import kotlinx.dnq.link.OnDeletePolicy
-import kotlinx.dnq.xdLink1
-import kotlinx.dnq.xdRequiredStringProp
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import org.joda.time.DateTime
 
 class XodusClassTimetable(entity: Entity) : XdEntity(entity) {
-    companion object : XdNaturalEntityType<XodusClassTimetable>()
+    companion object : XdNaturalEntityType<XodusClassTimetable>() {
+        override fun new(init: XodusClassTimetable.() -> Unit): XodusClassTimetable {
+            return super.new(init).also { it.validFrom = DateTime.now().withTimeAtStartOfDay() }
+        }
+    }
 
     var schoolClass by xdLink1(
         XodusClass::timetable,
@@ -31,6 +33,8 @@ class XodusClassTimetable(entity: Entity) : XdEntity(entity) {
     var thursday by xdRequiredStringProp { }
     var friday by xdRequiredStringProp { }
     var saturday by xdRequiredStringProp { }
+    var validFrom by xdRequiredDateTimeProp { }
+        private set
 
     fun toTimetable(): Timetable = Timetable(
         Json.decodeFromString(monday),

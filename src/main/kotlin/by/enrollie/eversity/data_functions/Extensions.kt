@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.data_functions
 
+import org.joda.time.format.DateTimeFormatter
 import java.text.ParseException
 import java.text.SimpleDateFormat
 
@@ -18,5 +19,11 @@ val <A, B> Pair<A?, B?>.areNulls: Boolean
 fun SimpleDateFormat.tryToParse(string: String) = try {
     this.parse(string)
 } catch (e: ParseException) {
+    null
+}
+
+fun DateTimeFormatter.tryToParse(string: String) = try {
+    this.parseDateTime(string)
+} catch (e: IllegalArgumentException) {
     null
 }

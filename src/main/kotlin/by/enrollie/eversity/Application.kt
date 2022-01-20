@@ -54,6 +54,7 @@ private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
     private set
 const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
+const val DATE_FORMAT = "YYYY-MM-dd"
 lateinit var AbsencePlacer: EversityPlacer
     private set
 lateinit var SchoolsCredentialsChecker: CredentialsChecker
