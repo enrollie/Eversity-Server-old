@@ -7,10 +7,17 @@
 
 package by.enrollie.eversity.data_classes
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Lesson(val place: Int, val title: String, val classID: Int, val schedule: TimeConstraints)
+data class Lesson(
+    val place: Int,
+    val title: String,
+    @SerialName("classId")
+    val classID: Int,
+    val schedule: TimeConstraints,
+)
 
 fun Array<com.neitex.Lesson>.toLessons(): Array<Lesson> = this.map {
     Lesson(it.place.toInt(), it.title, it.classID, it.timeConstraints.toTimeConstraints())

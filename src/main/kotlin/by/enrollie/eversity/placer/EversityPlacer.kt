@@ -9,10 +9,10 @@ package by.enrollie.eversity.placer
 
 import by.enrollie.eversity.configSubdomainURL
 import by.enrollie.eversity.data_classes.Absence
+import by.enrollie.eversity.data_classes.DummyAbsence
 import by.enrollie.eversity.database.functions.insertAbsences
-import by.enrollie.eversity.database.functions.insertDummyAbsence
+import by.enrollie.eversity.database.functions.insertDummyAbsences
 import by.enrollie.eversity.launchPeriodicAsync
-import by.enrollie.eversity.placer.data_classes.PlaceJob
 import io.ktor.client.*
 import io.ktor.client.features.*
 import io.ktor.client.request.*
@@ -21,7 +21,6 @@ import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
-import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.launch
 import org.joda.time.DateTime
 import org.joda.time.Seconds
@@ -36,11 +35,7 @@ import java.util.concurrent.TimeUnit
  */
 @OptIn(ObsoleteCoroutinesApi::class)
 class EversityPlacer {
-
-    private var _schoolsByAvailable = true
     private val log: Logger = LoggerFactory.getLogger(this::class.java)
-
-    val schoolsByStatusChannel = BroadcastChannel<Boolean>(100)
     var schoolsByAvailability: Boolean = true
         private set
     private var nextSchoolsByCheck: DateTime = DateTime.now()
@@ -50,33 +45,31 @@ class EversityPlacer {
     /**
      * Immediately sets absence to database
      */
-    fun postAbsence(jobList: List<PlaceJob>) {
+    fun postAbsence(jobList: List<Absence>, dummiesJobs: List<DummyAbsence> = listOf()) {
         log.debug(
             "Placing absence list of size ${jobList.size} and classes ID {${
-                jobList.map { it.pupil.classID }.toSet().joinToString { "$it; " }
+                jobList.map { it.classID }.toSet().joinToString { "$it; " }
             }}; List hashcode: ${jobList.hashCode()}"
         )
-        insertAbsences(jobList.filter { it.reason != null }.map {
-            Absence(
-                it.pupil.id,
-                it.pupil.classID,
-                it.postedBy,
-                it.date.withTimeAtStartOfDay(),
-                it.reason!!, it.absenceList, it.additionalNotes
-            )
-        })
-        jobList.filter { it.reason == null }.takeIf { it.isNotEmpty() }?.forEach {
-            insertDummyAbsence(it.pupil.classID, it.date.withTimeAtStartOfDay())
-        }
+        insertAbsences(jobList)
         log.debug("Placed absence list of hashcode ${jobList.hashCode()}")
+        if (dummiesJobs.isNotEmpty()){
+            log.debug("Placing dummy absences for list of size ${dummiesJobs.size} and classes ID {${
+                dummiesJobs.map { it.classID }.toSet().joinToString { "$it; " }
+            }}; List hashcode: ${dummiesJobs.hashCode()}-dummy")
+            insertDummyAbsences(dummiesJobs)
+            log.debug("Inserted dummy absences list of hashcode ${dummiesJobs.hashCode()}-dummies")
+        }
         sendAbsenceJobToSchoolsBy(jobList)
     }
 
-    private fun sendAbsenceJobToSchoolsBy(jobList: List<PlaceJob>) {
+    @Suppress("UNUSED_PARAMETER")
+    private fun sendAbsenceJobToSchoolsBy(jobList: List<Absence>) {
         // NO-OP until there will be some way to post absence to Schools.by
         // See https://github.com/enrollie/Eversity-Server/issues/1
     }
 
+    @Suppress("unused")
     private val schoolsByCheckerJob = CoroutineScope(Dispatchers.IO).launch {
         val logger = LoggerFactory.getLogger("SchoolsByChecker")
         launchPeriodicAsync(TimeUnit.MINUTES.toMillis(15)) {
@@ -100,7 +93,6 @@ class EversityPlacer {
                 false
             }
             logger.debug("Received Schools.by status: $availability")
-            schoolsByStatusChannel.send(availability)
             if (schoolsByAvailability != availability)
                 logger.info("New Schools.by status set: $availability; Time of status check: ${DateTime.now()}")
             schoolsByAvailability = availability

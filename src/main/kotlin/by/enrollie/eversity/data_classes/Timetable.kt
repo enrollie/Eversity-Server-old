@@ -35,7 +35,7 @@ class Timetable {
         wednesday: Array<Lesson> = arrayOf(),
         thursday: Array<Lesson> = arrayOf(),
         friday: Array<Lesson> = arrayOf(),
-        saturday: Array<Lesson> = arrayOf()
+        saturday: Array<Lesson> = arrayOf(),
     ) {
         lessons = kotlin.run {
             val map = mutableMapOf<DayOfWeek, Array<Lesson>>()
@@ -84,6 +84,25 @@ class Timetable {
         get() = lessons[DayOfWeek.FRIDAY]!!
     val saturday: Array<Lesson>
         get() = lessons[DayOfWeek.SATURDAY]!!
+
+    fun toTwoShiftsTimetable(isSecondShift: Boolean): TwoShiftsTimetable = if (isSecondShift)
+        TwoShiftsTimetable(
+            monday = Pair(arrayOf(), this.monday),
+            tuesday = Pair(arrayOf(), this.tuesday),
+            wednesday = Pair(arrayOf(), this.wednesday),
+            thursday = Pair(arrayOf(), this.thursday),
+            friday = Pair(arrayOf(), this.friday),
+            saturday = Pair(arrayOf(), this.saturday)
+        )
+    else TwoShiftsTimetable(
+        monday = Pair(this.monday, arrayOf()),
+        tuesday = Pair(this.tuesday, arrayOf()),
+        wednesday = Pair(this.wednesday, arrayOf()),
+        thursday = Pair(this.thursday, arrayOf()),
+        friday = Pair(this.friday, arrayOf()),
+        saturday = Pair(this.saturday, arrayOf())
+    )
+
 }
 
 @Serializable
@@ -106,7 +125,7 @@ class TwoShiftsTimetable {
         wednesday: Pair<Array<Lesson>, Array<Lesson>> = Pair(arrayOf(), arrayOf()),
         thursday: Pair<Array<Lesson>, Array<Lesson>> = Pair(arrayOf(), arrayOf()),
         friday: Pair<Array<Lesson>, Array<Lesson>> = Pair(arrayOf(), arrayOf()),
-        saturday: Pair<Array<Lesson>, Array<Lesson>> = Pair(arrayOf(), arrayOf())
+        saturday: Pair<Array<Lesson>, Array<Lesson>> = Pair(arrayOf(), arrayOf()),
     ) {
         lessons = kotlin.run {
             val map = mutableMapOf<DayOfWeek, Pair<Array<Lesson>, Array<Lesson>>>()

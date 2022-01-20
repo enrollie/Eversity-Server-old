@@ -18,6 +18,7 @@ import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.routes.authRoute
+import by.enrollie.eversity.routes.classRoute
 import by.enrollie.eversity.routes.userRoute
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
@@ -89,6 +90,7 @@ fun Application.registerRoutes() {
     routing {
         authRoute()
         userRoute()
+        classRoute()
     }
 }
 

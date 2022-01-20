@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.data_classes
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 typealias ClassID = Int
@@ -16,6 +17,7 @@ data class SchoolClass(
     val id: Int,
     val title: String,
     val isSecondShift: Boolean,
+    @SerialName("classTeacherId")
     val classTeacherID: Int,
     val pupils: Array<Pupil>
 ) {

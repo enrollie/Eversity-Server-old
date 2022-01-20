@@ -8,10 +8,11 @@
 package by.enrollie.eversity.database.xodus_definitions
 
 import jetbrains.exodus.entitystore.Entity
-import kotlinx.dnq.*
-import kotlinx.dnq.query.startsWith
+import kotlinx.dnq.XdEntity
 import kotlinx.dnq.simple.min
 import kotlinx.dnq.singleton.XdSingletonEntityType
+import kotlinx.dnq.xdRequiredDateTimeProp
+import kotlinx.dnq.xdRequiredIntProp
 import org.joda.time.DateTime
 
 class XodusAppData(entity: Entity) : XdEntity(entity) {

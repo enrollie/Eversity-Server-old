@@ -32,7 +32,7 @@ private data class UserInfo(
     val type: UserType,
     val firstName: String,
     val middleName: String?,
-    val lastName: String
+    val lastName: String,
 )
 
 private fun Route.usersRoute() {
@@ -90,6 +90,8 @@ private fun Route.userTimetable() {
                 val routeUserID = call.parameters["userId"]?.toIntOrNull()
                     ?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                     ?: throw ParameterConversionException("userId", "userId")
+                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value)
+                    return@get call.respond(Json.encodeToJsonElement<Array<Lesson>>(arrayOf()))
                 return@get when (getUserType(routeUserID)) {
                     UserType.Teacher, UserType.Administration -> {
                         call.respond(
@@ -97,25 +99,8 @@ private fun Route.userTimetable() {
                         )
                     }
                     UserType.Pupil -> {
-                        call.respond(getClassTimetable(getPupilClass(routeUserID)).let {
-                            if (getClass(getPupilClass(routeUserID)).isSecondShift)
-                                TwoShiftsTimetable(
-                                    monday = Pair(arrayOf(), it.monday),
-                                    tuesday = Pair(arrayOf(), it.tuesday),
-                                    wednesday = Pair(arrayOf(), it.wednesday),
-                                    thursday = Pair(arrayOf(), it.thursday),
-                                    friday = Pair(arrayOf(), it.friday),
-                                    saturday = Pair(arrayOf(), it.saturday)
-                                )[DayOfWeek.of(DateTime.now().dayOfWeek)]
-                            else TwoShiftsTimetable(
-                                monday = Pair(it.monday, arrayOf()),
-                                tuesday = Pair(it.tuesday, arrayOf()),
-                                wednesday = Pair(it.wednesday, arrayOf()),
-                                thursday = Pair(it.thursday, arrayOf()),
-                                friday = Pair(it.friday, arrayOf()),
-                                saturday = Pair(it.saturday, arrayOf())
-                            )[DayOfWeek.of(DateTime.now().dayOfWeek)]
-                        })
+                        val pupilClassID = getPupilClass(routeUserID)
+                        call.respond(getClassTimetable(pupilClassID).toTwoShiftsTimetable(getClass(pupilClassID).isSecondShift))
                     }
                     else -> call.respond(
                         TwoShiftsTimetable()[DayOfWeek.of(DateTime.now().dayOfWeek)]
@@ -126,30 +111,16 @@ private fun Route.userTimetable() {
                 val routeUserID = call.parameters["userId"]?.toIntOrNull()
                     ?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                     ?: throw ParameterConversionException("userId", "userId")
+                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value)
+                    return@get call.respond(Json.encodeToJsonElement<Lesson?>(null))
                 val lessonsList = when (getUserType(routeUserID)) {
                     UserType.Teacher, UserType.Administration -> {
                         getTeacherTimetable(routeUserID)[DayOfWeek.of(DateTime.now().dayOfWeek)]
                     }
                     UserType.Pupil -> {
-                        getClassTimetable(getPupilClass(routeUserID)).let {
-                            if (getClass(getPupilClass(routeUserID)).isSecondShift)
-                                TwoShiftsTimetable(
-                                    monday = Pair(arrayOf(), it.monday),
-                                    tuesday = Pair(arrayOf(), it.tuesday),
-                                    wednesday = Pair(arrayOf(), it.wednesday),
-                                    thursday = Pair(arrayOf(), it.thursday),
-                                    friday = Pair(arrayOf(), it.friday),
-                                    saturday = Pair(arrayOf(), it.saturday)
-                                )[DayOfWeek.of(DateTime.now().dayOfWeek)]
-                            else TwoShiftsTimetable(
-                                monday = Pair(it.monday, arrayOf()),
-                                tuesday = Pair(it.tuesday, arrayOf()),
-                                wednesday = Pair(it.wednesday, arrayOf()),
-                                thursday = Pair(it.thursday, arrayOf()),
-                                friday = Pair(it.friday, arrayOf()),
-                                saturday = Pair(it.saturday, arrayOf())
-                            )[DayOfWeek.of(DateTime.now().dayOfWeek)]
-                        }
+                        val pupilClass = getPupilClass(routeUserID)
+                        getClassTimetable(pupilClass).toTwoShiftsTimetable(getClass(pupilClass).isSecondShift)[DayOfWeek.of(
+                            DateTime.now().dayOfWeek)]
                     }
                     else ->
                         TwoShiftsTimetable()[DayOfWeek.of(DateTime.now().dayOfWeek)]
@@ -171,10 +142,10 @@ private fun Route.userTimetable() {
 }
 
 @Serializable
-private data class IntegrationData(val integrationID: String, val publicName: String, val connected: Boolean)
+private data class IntegrationData(val integrationId: String, val publicName: String, val connected: Boolean)
 
 @Serializable
-private data class IntegrationRequest(val integrationID: String)
+private data class IntegrationRequest(val integrationId: String)
 
 private fun Route.userIntegrations() {
     route("/integrations") {
@@ -201,13 +172,13 @@ private fun Route.userIntegrations() {
             val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
                 ?: throw ParameterConversionException("userId", "userId")
             val availableIntegrations = PluginProvider.getAvailableIntegrationsForUser(userID)
-            if (availableIntegrations.find { it.metadata.id == integrationRequest.integrationID } == null)
+            if (availableIntegrations.find { it.metadata.id == integrationRequest.integrationId } == null)
                 return@put call.respond(
                     HttpStatusCode.BadRequest,
-                    ErrorResponse.integrationNotFound(integrationRequest.integrationID)
+                    ErrorResponse.integrationNotFound(integrationRequest.integrationId)
                 )
             if (PluginProvider.getRegisteredIntegrations(userID)
-                    .find { it.metadata.id == integrationRequest.integrationID } != null
+                    .find { it.metadata.id == integrationRequest.integrationId } != null
             )
                 return@put call.respond(
                     HttpStatusCode.Conflict,
@@ -217,7 +188,7 @@ private fun Route.userIntegrations() {
                 Json.encodeToJsonElement(
                     PluginProvider.requestRegistration(
                         userID,
-                        integrationRequest.integrationID
+                        integrationRequest.integrationId
                     )
                 )
             )
@@ -228,12 +199,12 @@ private fun Route.userIntegrations() {
             val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
                 ?: throw ParameterConversionException("userId", "userId")
             val integrations = PluginProvider.getRegisteredIntegrations(userID)
-            if (integrations.find { it.metadata.id == integrationRequest.integrationID } == null)
+            if (integrations.find { it.metadata.id == integrationRequest.integrationId } == null)
                 return@delete call.respond(
                     HttpStatusCode.BadRequest,
-                    ErrorResponse.integrationNotFound(integrationRequest.integrationID)
+                    ErrorResponse.integrationNotFound(integrationRequest.integrationId)
                 )
-            PluginProvider.requestDeletion(userID, integrationRequest.integrationID)
+            PluginProvider.requestDeletion(userID, integrationRequest.integrationId)
             call.respond(HttpStatusCode.OK)
         }
     }
