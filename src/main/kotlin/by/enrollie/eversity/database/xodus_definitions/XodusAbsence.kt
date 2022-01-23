@@ -35,5 +35,6 @@ class XodusAbsence(entity: Entity) : XdEntity(entity) {
     var lessons by xdSetProp<XodusAbsence, Short>()
     var reason by xdLink1(XodusAbsenceReason)
     var sentBy by xdLink0_1(XodusUser)
+    var lastChangeDate by xdRequiredDateTimeProp { }
     var additionalNotes by xdLink0_1(XodusAbsenceNotes)
 }

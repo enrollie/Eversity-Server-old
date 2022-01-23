@@ -9,11 +9,9 @@ package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.data_classes.SchoolClass
 import by.enrollie.eversity.database.classesCache
-import by.enrollie.eversity.database.xodus_definitions.XodusParentProfile
-import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
-import by.enrollie.eversity.database.xodus_definitions.XodusUser
-import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
+import by.enrollie.eversity.database.xodus_definitions.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 
@@ -35,11 +33,12 @@ fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): Int = st
  * @param classID Class ID
  * @throws NoSuchElementException Thrown, when class with that ID was not found
  */
-fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = classesCache.get(classID) {
-    store.transactional(readonly = true) {
-        getClassInDB(classID)
+fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true){
+    XodusClass.query((XodusClass::id eq classID)).first().let {
+        classesCache.put(classID, SchoolClass(it.id,it.classTitle,it.isSecondShift,it.classTeacher.user.id))
+        it.pupils.toList().toPupilsArray()
     }
-}.pupils
+}
 
 fun getNonExistentPupilsIDs(pupils: List<Pupil>, store: TransientEntityStore = DATABASE) =
     store.transactional(readonly = true) {
@@ -60,3 +59,9 @@ fun assignPupilsToParents(assignList: List<Pair<Int, Int>>, store: TransientEnti
                 )
         }
     }
+
+fun getPupilsCount(store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusPupilProfile.all().toList().groupingBy { it.schoolClass.isSecondShift }.eachCount().let {
+        Pair(it[false] ?: 0, it[true] ?: 0)
+    }
+}

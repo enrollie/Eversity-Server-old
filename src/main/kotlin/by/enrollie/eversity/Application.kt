@@ -17,6 +17,7 @@ import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
+import by.enrollie.eversity.routes.absenceRoute
 import by.enrollie.eversity.routes.authRoute
 import by.enrollie.eversity.routes.classRoute
 import by.enrollie.eversity.routes.userRoute
@@ -92,6 +93,7 @@ fun Application.registerRoutes() {
         authRoute()
         userRoute()
         classRoute()
+        absenceRoute()
     }
 }
 

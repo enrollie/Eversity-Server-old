@@ -14,11 +14,12 @@ import kotlinx.dnq.link.OnDeletePolicy
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.joda.time.DateTime
+import org.joda.time.LocalTime
 
 class XodusClassTimetable(entity: Entity) : XdEntity(entity) {
     companion object : XdNaturalEntityType<XodusClassTimetable>() {
         override fun new(init: XodusClassTimetable.() -> Unit): XodusClassTimetable {
-            return super.new(init).also { it.validFrom = DateTime.now().withTimeAtStartOfDay() }
+            return super.new(init).also { it.validFrom = DateTime.now().withTime(LocalTime.MIDNIGHT) }
         }
     }
 

@@ -40,8 +40,7 @@ fun doesClassExist(classID: Int, store: TransientEntityStore = DATABASE): Boolea
                 it.id,
                 it.classTitle,
                 it.isSecondShift,
-                it.classTeacher.user.id,
-                it.pupils.toList().toPupilsArray()
+                it.classTeacher.user.id
             )
         }
     }
@@ -80,9 +79,7 @@ fun getClassTimetable(classID: Int, store: TransientEntityStore = DATABASE): Tim
 
 internal fun getClassInDB(classID: ClassID): SchoolClass {
     return XodusClass.query(XodusClass::id eq classID).firstOrNull()?.let {
-        SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id, it.pupils.toList().map {
-            Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, classID)
-        }.toTypedArray())
+        SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id)
     } ?: throw NoSuchElementException("No class with ID $classID")
 }
 
@@ -123,11 +120,10 @@ fun getClassStatistics(
                     it.sentBy?.id,
                     it.date,
                     it.reason.toAbsenceReason(),
-                    it.lessons.toList(),
+                    it.lessons.toList(),it.lastChangeDate,
                     it.additionalNotes?.let { note ->
                         AbsenceNoteJSON.decodeFromString(note.note)
-                    }
-                )
+                    })
             }
         )
     }

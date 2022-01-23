@@ -53,7 +53,7 @@ private fun Route.classGet() {
         call.respond(ResponseSchoolClass(classID,
             classData.title,
             classData.isSecondShift,
-            classData.pupils.size,
+            getPupilsInClass(classID).size,
             classData.classTeacherID,
             getUserName(classData.classTeacherID).fullForm))
     }
@@ -62,7 +62,7 @@ private fun Route.classGet() {
 @Serializable
 private data class AbsencePair(val pupil: Pupil, val absences: Set<Absence>)
 
-private fun Route.absence() {
+private fun Route.classAbsence() {
     route("/absence") {
         get {
             val classID =
@@ -83,8 +83,8 @@ private fun Route.absence() {
             } else {
                 getClassAbsence(classID, Pair(dates.first!!, dates.second!!))
             }
-            val classData = getClass(classID)
-            call.respond(AbsenceNoteJSON.encodeToJsonElement(classData.pupils.map { pupil ->
+            val pupilsArray = getPupilsInClass(classID)
+            call.respond(AbsenceNoteJSON.encodeToJsonElement(pupilsArray.map { pupil ->
                 AbsencePair(pupil, absenceData.filter { it.pupilID == pupil.id }.toSet())
             }))
         }
@@ -128,11 +128,11 @@ private fun Route.absenceDate() {
             ?: throw ParameterConversionException("classId", "classId")
         val date = (DateTimeFormat.forPattern(DATE_FORMAT)
             .tryToParse(call.parameters["date"] ?: throw MissingRequestParameterException("date"))
-            ?: throw ParameterConversionException("date", "date")).withTimeAtStartOfDay()
+            ?: throw ParameterConversionException("date", "date")).withTime(LocalTime.MIDNIGHT)
 
         val absenceData = getClassAbsence(classID, date)
-        val classData = getClass(classID)
-        call.respond(AbsenceNoteJSON.encodeToJsonElement(classData.pupils.map { pupil ->
+        val pupilsArray = getPupilsInClass(classID)
+        call.respond(AbsenceNoteJSON.encodeToJsonElement(pupilsArray.map { pupil ->
             AbsencePair(pupil, absenceData.filter { it.pupilID == pupil.id }.toSet())
         }))
     }
@@ -159,11 +159,10 @@ private fun Route.timetable() {
                 val classID =
                     (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
                         ?: throw ParameterConversionException("classId", "classId")
-                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value) return@get call.respond(Pair<Array<Lesson>, Array<Lesson>>(
-                    arrayOf(),
-                    arrayOf()))
-                call.respond(getClassTimetable(classID).toTwoShiftsTimetable(getClass(classID).isSecondShift)[DayOfWeek.of(
-                    DateTime.now().dayOfWeek)])
+                if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value) return@get call.respond(Json.encodeToJsonElement(
+                    null as Lesson?))
+                call.respond(Json.encodeToJsonElement(getClassTimetable(classID).toTwoShiftsTimetable(getClass(classID).isSecondShift)[DayOfWeek.of(
+                    DateTime.now().dayOfWeek)].toList().first { it.isNotEmpty() }.firstOrNull()))
             }
             get("/current") {
                 val classID =
@@ -192,7 +191,7 @@ fun Route.classRoute() {
     route("/class/{classId}") {
         authenticate("jwt") {
             classGet()
-            absence()
+            classAbsence()
             pupils()
             timetable()
         }

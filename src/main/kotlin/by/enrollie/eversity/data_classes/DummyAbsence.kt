@@ -8,6 +8,7 @@
 package by.enrollie.eversity.data_classes
 
 import org.joda.time.DateTime
+import org.joda.time.LocalTime
 
 /**
  * Used to represent dummy absence **inside** application
@@ -18,6 +19,6 @@ data class DummyAbsence(
     val dateTime: DateTime
 
     init {
-        dateTime = dateTime_.withTimeAtStartOfDay()
+        dateTime = dateTime_.withTime(LocalTime.MIDNIGHT)
     }
 }

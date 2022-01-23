@@ -10,7 +10,7 @@ package by.enrollie.eversity.placer.data_classes
 import by.enrollie.eversity.data_classes.AbsenceNoteWrapper
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.UserID
-import by.enrollie.eversity.serializers.DateTimeSerializer
+import by.enrollie.eversity.serializers.DateSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.joda.time.DateTime
@@ -21,7 +21,7 @@ data class PlaceJob(
     val pupilID: UserID?,
     val lessonsList: List<Short>,
     val reason: AbsenceReason?,
-    @Serializable(DateTimeSerializer::class)
+    @Serializable(DateSerializer::class)
     val date: DateTime,
     @SerialName("note")
     val additionalNotes: AbsenceNoteWrapper? = null
