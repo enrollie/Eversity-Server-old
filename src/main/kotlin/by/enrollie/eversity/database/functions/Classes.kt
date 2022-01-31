@@ -16,7 +16,7 @@ import by.enrollie.eversity.database.xodus_definitions.XodusAbsenceReason.Compan
 import by.enrollie.eversity.database.xodus_definitions.XodusClass
 import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
 import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
-import by.enrollie.eversity.exceptions.noClassError
+import by.enrollie.eversity.exceptions.NoSuchSchoolClassException
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 import kotlinx.serialization.decodeFromString
@@ -52,13 +52,14 @@ fun doesClassExist(classID: Int, store: TransientEntityStore = DATABASE): Boolea
 /**
  * Returns class timetable
  * @param classID ID of class
- * @throws NoSuchElementException Thrown, if class was not found
+ * @throws NoSuchSchoolClassException Thrown, if class was not found
  * @return Map, containing six arrays of lessons (may be unsorted), mapped to six [DayOfWeek]'s (from Monday to Saturday)
  */
-fun getClassTimetable(classID: Int, store: TransientEntityStore = DATABASE): Timetable {
+fun getClassTimetable(classID: ClassID, store: TransientEntityStore = DATABASE): Timetable {
     return classTimetablesCache.get(classID) {
         store.transactional(readonly = true) {
-            val timetableQuery = XodusClass.query(XodusClass::id eq classID).first().timetable
+            val timetableQuery = (XodusClass.query(XodusClass::id eq classID).firstOrNull()
+                ?: throw NoSuchSchoolClassException(classID)).timetable
             val timetableMap = mutableMapOf<DayOfWeek, Array<Lesson>>()
             timetableMap[DayOfWeek.MONDAY] =
                 Json.decodeFromString(timetableQuery.monday)
@@ -80,12 +81,12 @@ fun getClassTimetable(classID: Int, store: TransientEntityStore = DATABASE): Tim
 internal fun getClassInDB(classID: ClassID): SchoolClass {
     return XodusClass.query(XodusClass::id eq classID).firstOrNull()?.let {
         SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id)
-    } ?: throw NoSuchElementException("No class with ID $classID")
+    } ?: throw NoSuchSchoolClassException(classID)
 }
 
 /**
  * Returns [SchoolClass] based on given [classID]
- * @throws NoSuchElementException Thrown if class was not found
+ * @throws NoSuchSchoolClassException Thrown if class was not found
  */
 fun getClass(classID: Int, store: TransientEntityStore = DATABASE): SchoolClass = classesCache.get(classID) {
     store.transactional(readonly = true) {
@@ -101,14 +102,14 @@ fun countPupils(): Pair<Int, Int> = DATABASE.transactional(readonly = true) {
 }
 
 fun getClassStatistics(
-    classID: Int,
+    classID: ClassID,
     startDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.MONDAY),
-    endDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY)
+    endDate: DateTime = DateTime.now().withDayOfWeek(DateTimeConstants.SATURDAY),
 ): List<Pair<Pupil, ExtendedPupilAbsenceStatistics>> {
     val (pupils, absences) = DATABASE.transactional(readonly = true) {
         Pair(
             XodusClass.query(XodusClass::id eq classID).firstOrNull()?.pupils?.toList()?.toPupilsArray()
-                ?: noClassError(classID),
+                ?: throw NoSuchSchoolClassException(classID),
             XodusAbsence.query(
                 (XodusAbsence::date ge startDate) and (XodusAbsence::date le endDate) and (XodusAbsence::schoolClass.matches(
                     XodusClass::id eq classID

@@ -13,6 +13,7 @@ import by.enrollie.eversity.database.usersCache
 import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusSchoolsBy
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
+import by.enrollie.eversity.exceptions.NoSuchUserException
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 
@@ -69,34 +70,7 @@ fun getUserInfo(userID: UserID, store: TransientEntityStore = DATABASE): User? {
     if (cachedUser != null)
         return cachedUser
     val user = store.transactional(readonly = true) {
-        XodusUser.query(XodusUser::id eq userID).firstOrNull()?.let {
-            when (it.type.toEnum()) {
-                UserType.Teacher, UserType.Administration -> {
-                    Teacher(it.id, it.firstName, it.middleName, it.lastName)
-                }
-                UserType.Pupil -> {
-                    Pupil(
-                        it.id,
-                        it.firstName,
-                        it.middleName,
-                        it.lastName,
-                        (it.profile as XodusPupilProfile).schoolClass.id
-                    )
-                }
-                UserType.Parent -> {
-                    Parent(it.id, it.firstName, it.middleName, it.lastName)
-                }
-                UserType.SYSTEM, UserType.Social -> {
-                    object : User {
-                        override val id: Int = it.id
-                        override val type: UserType = UserType.SYSTEM
-                        override val firstName: String = it.firstName
-                        override val middleName: String? = it.middleName
-                        override val lastName: String = it.lastName
-                    }
-                }
-            }
-        }
+        getUserData(userID)
     }
     if (user != null)
         usersCache.put(userID, user)
@@ -117,9 +91,14 @@ fun getAllSchoolsByCredentials(store: TransientEntityStore = DATABASE): List<Pai
  * @param credentials Pair of (CSRFToken, SessionID)
  * @throws NoSuchElementException Thrown, if user does not exist
  */
-fun recordSchoolsByCredentials(userID: Int, credentials: Pair<String, String>, store: TransientEntityStore = DATABASE) =
+fun recordSchoolsByCredentials(
+    userID: UserID,
+    credentials: Pair<String, String>,
+    store: TransientEntityStore = DATABASE,
+) =
     store.transactional {
-        XodusUser.query(XodusUser::id eq userID).first().schoolsByCredentials.apply {
+        (XodusUser.query(XodusUser::id eq userID).firstOrNull()
+            ?: throw NoSuchUserException(userID)).schoolsByCredentials.apply {
             if (this.isEmpty)
                 XodusSchoolsBy.new {
                     user = XodusUser.query(XodusUser::id eq userID).first()
@@ -138,36 +117,9 @@ fun recordSchoolsByCredentials(userID: Int, credentials: Pair<String, String>, s
  * @param userID User's ID
  * @throws NoSuchElementException Thrown, if user is not registered
  */
-fun getUserType(userID: Int, store: TransientEntityStore = DATABASE): UserType = usersCache.get(userID) {
+fun getUserType(userID: UserID, store: TransientEntityStore = DATABASE): UserType = usersCache.get(userID) {
     store.transactional(readonly = true) {
-        XodusUser.query(XodusUser::id eq userID).first().let {
-            when (it.type.toEnum()) {
-                UserType.Teacher, UserType.Administration -> {
-                    Teacher(it.id, it.firstName, it.middleName, it.lastName)
-                }
-                UserType.Pupil -> {
-                    Pupil(
-                        it.id,
-                        it.firstName,
-                        it.middleName,
-                        it.lastName,
-                        (it.profile as XodusPupilProfile).schoolClass.id
-                    )
-                }
-                UserType.Parent -> {
-                    Parent(it.id, it.firstName, it.middleName, it.lastName)
-                }
-                UserType.SYSTEM, UserType.Social -> {
-                    object : User {
-                        override val id: Int = it.id
-                        override val type: UserType = UserType.SYSTEM
-                        override val firstName: String = it.firstName
-                        override val middleName: String? = it.middleName
-                        override val lastName: String = it.lastName
-                    }
-                }
-            }
-        }
+        getUserData(userID) ?: throw NoSuchUserException(userID)
     }
 }.type
 
@@ -175,10 +127,11 @@ fun getUserType(userID: Int, store: TransientEntityStore = DATABASE): UserType =
  * Returns user's full name
  * @param userID User ID
  */
-fun getUserName(userID: Int, store: TransientEntityStore = DATABASE): UserName = store.transactional(readonly = true) {
-    XodusUser.query(XodusUser::id eq userID).first().packName()
-}
+fun getUserName(userID: UserID, store: TransientEntityStore = DATABASE): UserName =
+    store.transactional(readonly = true) {
+        (XodusUser.query(XodusUser::id eq userID).firstOrNull() ?: throw NoSuchUserException(userID)).packName()
+    }
 
-fun deleteSchoolsByCredentials(userID: Int, store: TransientEntityStore = DATABASE) = store.transactional {
+fun deleteSchoolsByCredentials(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
     XodusSchoolsBy.query(XodusSchoolsBy::user.matches(XodusUser::id eq userID)).firstOrNull()?.delete()
 }

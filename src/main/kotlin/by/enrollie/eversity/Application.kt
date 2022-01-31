@@ -17,26 +17,31 @@ import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
+import by.enrollie.eversity.plugins.installExceptionStatus
 import by.enrollie.eversity.routes.absenceRoute
 import by.enrollie.eversity.routes.authRoute
 import by.enrollie.eversity.routes.classRoute
 import by.enrollie.eversity.routes.userRoute
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
+import by.enrollie.eversity.uac.OsoSchoolClass
+import by.enrollie.eversity.uac.OsoUser
+import by.enrollie.eversity.uac.School
 import by.enrollie.eversity_plugins.plugin_api.SemVer
 import by.enrollie.eversity_plugins.plugin_api.ServerConfiguration
 import by.enrollie.eversity_plugins.plugin_api.TPIntegration
 import com.neitex.SchoolsByParser
-import io.ktor.application.*
-import io.ktor.config.*
-import io.ktor.features.*
+import com.osohq.oso.Oso
 import io.ktor.http.cio.websocket.*
-import io.ktor.routing.*
-import io.ktor.serialization.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.config.*
 import io.ktor.server.netty.*
-import io.ktor.websocket.*
+import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.coroutines.*
+import kotlinx.dnq.XdModel
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -54,7 +59,6 @@ var EVERSITY_PUBLIC_NAME = "Eversity "
 private var EVERSITY_VERSION = ""
 var EVERSITY_BUILD_DATE = ""
     private set
-const val EVERSITY_WEBSITE = "https://github.com/enrollie/Eversity-Server"
 const val DATE_FORMAT = "YYYY-MM-dd"
 lateinit var AbsencePlacer: EversityPlacer
     private set
@@ -67,6 +71,8 @@ lateinit var SCHOOL_WEBSITE: String
 lateinit var LOCAL_ACCOUNT_ISSUER: LocalLoginIssuer
     private set
 lateinit var DATABASE: TransientEntityStore
+    private set
+lateinit var OSO: Oso
     private set
 
 /**
@@ -82,11 +88,11 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: suspend () ->
         }
     }
 
-var configSubdomainURL: String? = null
+lateinit var configSubdomainURL: String
+    private set
 
 
-fun main(args: Array<String>): Unit =
-    EngineMain.main(args)
+fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 fun Application.registerRoutes() {
     routing {
@@ -100,12 +106,14 @@ fun Application.registerRoutes() {
 @Suppress("unused")
 // Referenced in application.conf
 fun Application.module() {
-    install(ContentNegotiation) {
+    install(io.ktor.server.plugins.ContentNegotiation) {
         json()
+        checkAcceptHeaderCompliance = true
     }
     install(WebSockets) {
-        pingPeriod = Duration.ofSeconds(1)
+        pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
+        maxFrameSize = Long.MAX_VALUE
         masking = false
     }
     kotlin.run {
@@ -122,26 +130,26 @@ fun Application.module() {
         val props = Properties()
         props.load(namingFile.reader(charset("UTF-8")))
         try {
-            SCHOOL_NAME = SchoolNameDeclensions(
-                props.getProperty("nominative"),
+            SCHOOL_NAME = SchoolNameDeclensions(props.getProperty("nominative"),
                 props.getProperty("genitive"),
                 props.getProperty("accusative"),
                 props.getProperty("dative"),
                 props.getProperty("instrumental"),
                 props.getProperty("prepositional"),
-                props.getProperty("location")
-            )
+                props.getProperty("location"))
         } catch (e: NoSuchElementException) {
             throw ApplicationConfigurationException("School naming file error: ${e.message}")
         }
     }
     configureBanner()
-    //JWT generator initialization
+//JWT generator initialization
     val secretJWT = this.environment.config.config("jwt").property("secret").getString()
     EversityJWT.initialize(secretJWT)
 
     DATABASE =
-        initXodusDatabase(File(environment.config.config("database").property("path").getString(), "eversity-db"))
+        initXodusDatabase(File(environment.config.config("database").property("path").getString()))
+    println(XdModel.hierarchy)
+    println(DATABASE.modelMetaData!!.entitiesMetaData.joinToString { "$it;; " })
 
     configSubdomainURL = environment.config.config("schools").property("subdomain").getString()
 
@@ -154,12 +162,12 @@ fun Application.module() {
         )
     kotlin.run {
         val localFile = File(environment.config.config("eversity").property("localAccountsFilePath").getString())
-        LOCAL_ACCOUNT_ISSUER =
-            if (!localFile.exists()) {
-                log.warn("Local accounts file is not available at path \'${localFile.absolutePath}\'! No local accounts will be available")
-                LocalLoginIssuer(mapOf())
-            } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
+        LOCAL_ACCOUNT_ISSUER = if (!localFile.exists()) {
+            log.warn("Local accounts file is not available at path \'${localFile.absolutePath}\'! No local accounts will be available")
+            LocalLoginIssuer(mapOf())
+        } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
     }
+
     val plugins = run {
         val pluginsDir = Paths.get("plugins")
         if (pluginsDir.notExists()) {
@@ -170,16 +178,15 @@ fun Application.module() {
         val pluginsFinder = ModuleFinder.of(pluginsDir)
         val plugins = pluginsFinder.findAll().stream().map { it.descriptor().name() }.collect(Collectors.toList())
         val pluginsConfiguration = ModuleLayer.boot().configuration().resolve(pluginsFinder, ModuleFinder.of(), plugins)
-        val layer = ModuleLayer
-            .boot()
-            .defineModulesWithOneLoader(pluginsConfiguration, ClassLoader.getSystemClassLoader())
+        val layer =
+            ModuleLayer.boot().defineModulesWithOneLoader(pluginsConfiguration, ClassLoader.getSystemClassLoader())
         ServiceLoader.load(layer, TPIntegration::class.java).toList()
     }
     PluginProvider.setPluginServerConfiguration(
         ServerConfiguration(
             SemVer.parse(
                 EVERSITY_VERSION.removePrefix("v").replaceAfter("-", "").removeSuffix("-")
-            ), SCHOOL_WEBSITE, configSubdomainURL!!
+            ), SCHOOL_WEBSITE, configSubdomainURL
         )
     )
     runBlocking {
@@ -187,8 +194,15 @@ fun Application.module() {
             PluginProvider.registerPlugin(it)
         }
     }
-    SchoolsByParser.setSubdomain(configSubdomainURL!!)
-
+    SchoolsByParser.setSubdomain(configSubdomainURL)
+    run { //Load Oso
+        OSO = Oso()
+        OSO.registerClass(School::class.java, "School")
+        OSO.registerClass(OsoSchoolClass::class.java, "SchoolClass")
+        OSO.registerClass(OsoUser::class.java, "User")
+        OSO.loadFiles(arrayOf("src/main/oso/authorization.polar"))
+    }
+    installExceptionStatus()
     configureAuthentication()
     configureHTTP()
     registerRoutes()

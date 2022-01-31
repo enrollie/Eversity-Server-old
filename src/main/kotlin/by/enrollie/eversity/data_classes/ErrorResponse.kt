@@ -36,7 +36,7 @@ data class ErrorResponse private constructor(val errorCode: String, val addition
 
         fun deserializationFailure(parameter: String, value: String) =
             ErrorResponse(
-                "DESERIALIZTION_FAILURE",
+                "DESERIALIZATION_FAILURE",
                 "Failed to deserialize parameter \'$parameter\' of value \'$value\'"
             )
 
@@ -51,5 +51,9 @@ data class ErrorResponse private constructor(val errorCode: String, val addition
                 "SCHOOLS_BY_UNAVAILABLE",
                 "Schools.by is unavailable. Next check is in ${AbsencePlacer.nextSchoolsByCheckIn.seconds} seconds"
             )
+        val genericNotFound: ErrorResponse
+            get() = ErrorResponse("NOT_FOUND", "Requested resource was not found")
+        val genericDeserializationException: ErrorResponse
+            get() = ErrorResponse("DESERIALIZATION_FAILURE", "Failed to deserialize input data")
     }
 }

@@ -8,6 +8,7 @@
 package by.enrollie.eversity.routes
 
 import by.enrollie.eversity.DATE_FORMAT
+import by.enrollie.eversity.OSO
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.AbsenceStatisticsPackage
 import by.enrollie.eversity.data_classes.ClassID
@@ -15,12 +16,16 @@ import by.enrollie.eversity.data_classes.UserID
 import by.enrollie.eversity.data_functions.tryToParse
 import by.enrollie.eversity.database.functions.getAbsenceStatistics
 import by.enrollie.eversity.database.functions.getDetailedAbsenceData
+import by.enrollie.eversity.database.functions.getNoAbsenceDataClasses
 import by.enrollie.eversity.database.functions.getPupilsCount
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.features.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import by.enrollie.eversity.security.User
+import by.enrollie.eversity.uac.OsoUser
+import by.enrollie.eversity.uac.School
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.joda.time.LocalDate
@@ -47,6 +52,8 @@ private data class DetailedAbsenceResponseElement(
 private fun Route.statistics() {
     route("/statistics") {
         get {
+            val user = call.authentication.principal<User>()!!
+            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
             val date = call.request.queryParameters["date"]?.let {
                 DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
                     ?: throw ParameterConversionException("date",
@@ -59,6 +66,8 @@ private fun Route.statistics() {
             call.respond(ShortAbsenceResponse(pupilsCount, statistics))
         }
         get("/detailed") {
+            val user = call.authentication.principal<User>()!!
+            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
             val date = call.request.queryParameters["date"]?.let {
                 DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
                     ?: throw ParameterConversionException("date",
@@ -77,10 +86,26 @@ private fun Route.statistics() {
     }
 }
 
+private fun Route.noData() {
+    route("/noData") {
+        get {
+            val user = call.authentication.principal<User>()!!
+            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
+            val date = call.request.queryParameters["date"]?.let {
+                DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
+                    ?: throw ParameterConversionException("date",
+                        "date")
+            } ?: LocalDate.now().toDateTime(LocalTime.MIDNIGHT)
+            call.respond(getNoAbsenceDataClasses(date))
+        }
+    }
+}
+
 fun Route.absenceRoute() {
     authenticate("jwt") {
         route("/absence") {
             statistics()
+            noData()
         }
     }
 }

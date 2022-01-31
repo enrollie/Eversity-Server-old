@@ -36,5 +36,10 @@
       <option name="name" value="maven4" />
       <option name="url" value="https://packages.jetbrains.team/maven/p/xodus/xodus-daily" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="ktor-eap" />
+      <option name="name" value="ktor-eap" />
+      <option name="url" value="https://maven.pkg.jetbrains.space/public/p/ktor/eap" />
+    </remote-repository>
   </component>
 </project>

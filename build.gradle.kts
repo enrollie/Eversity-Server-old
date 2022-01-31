@@ -19,7 +19,7 @@ plugins {
     application
     `maven-publish`
     kotlin("jvm") version "1.6.10"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.5.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.6.10"
     id("com.github.johnrengelman.shadow") version "7.0.0"
     id("io.wusa.semver-git-plugin") version "2.3.7"
 }
@@ -49,28 +49,19 @@ repositories {
     maven { url = uri("https://jitpack.io") }
     maven { url = uri("https://packages.neitex.me") }
     maven { url = uri("https://packages.jetbrains.team/maven/p/xodus/xodus-daily") }
+    maven {
+        url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap")
+        name = "ktor-eap"
+    }
 }
 
 dependencies {
     implementation(project(":server-api"))
     //----KTOR DEPENDENCIES
-    implementation("io.ktor:ktor-server-core:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-auth:$ktorVersion")
-    implementation("io.ktor:ktor-auth-jwt:$ktorVersion")
-    implementation("io.ktor:ktor-server-sessions:$ktorVersion")
-    implementation("io.ktor:ktor-server-host-common:$ktorVersion")
-    implementation("io.ktor:ktor-metrics:$ktorVersion")
-    implementation("io.ktor:ktor-serialization:$ktorVersion")
-    implementation("io.ktor:ktor-gson:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-websockets:$ktorVersion")
     implementation("org.apache.logging.log4j:log4j-api:2.17.0")
     implementation("org.apache.logging.log4j:log4j-core:2.17.0")
     implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.17.0")
-    implementation("org.slf4j:slf4j-api:1.7.32")
+    implementation("org.slf4j:slf4j-api:1.7.33")
     //----END OF KTOR DEPENDENCIES
 
     //----DATABASE DEPENDENCIES
@@ -98,11 +89,13 @@ dependencies {
 
 
     //----OTHER DEPENDENCIES
-    implementation("com.auth0:java-jwt:3.18.2")
-    implementation("com.neitex:schools_parser:0.0.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    implementation("com.osohq:oso:0.26.0")
+    implementation("com.auth0:java-jwt:3.18.3")
+    implementation("com.neitex:schools_parser:0.0.8")
     implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.0.4")
     implementation("com.github.ajalt.mordant:mordant:2.0.0-beta2")
-    implementation("team.yi.ktor:ktor-banner:0.2.0")
+    implementation("team.yi.ktor:ktor-banner:0.2.1") // From my own repository, implements changes in Ktor 2.0.0
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0-native-mt") {
         version {
             strictly("1.5.2-native-mt")
@@ -122,14 +115,29 @@ dependencies {
     }
     implementation("net.swiftzer.semver:semver:1.2.0")
     implementation("joda-time:joda-time:2.10.13")
+    implementation("io.ktor:ktor-server-auth:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
+    implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
+    implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
+    implementation("io.ktor:ktor-auth-jwt:$ktorVersion")
+    implementation("io.ktor:ktor-server-sessions:$ktorVersion")
+    implementation("io.ktor:ktor-server-host-common:$ktorVersion")
+    implementation("io.ktor:ktor-metrics:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-mock:$ktorVersion")
+    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     //----END OF OTHER DEPENDENCIES
 
     //----TEST DEPENDENCIES
-    testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
     testImplementation(kotlin("test-junit"))
-    implementation("io.ktor:ktor-client-mock:$ktorVersion")
     //----END OF TEST DEPENDENCIES
     implementation(kotlin("stdlib-jdk8"))
+    testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
 }
 
 val compileKotlin: KotlinCompile by tasks

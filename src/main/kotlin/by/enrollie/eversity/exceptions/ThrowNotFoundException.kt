@@ -7,6 +7,8 @@
 
 package by.enrollie.eversity.exceptions
 
+@Deprecated("Use \"throw NoSuchSchoolClassException\" instead",
+    ReplaceWith("NoSuchSchoolClassException"), level = DeprecationLevel.ERROR)
 fun noClassError(classID: Int, message: String = "Class with ID $classID was not found"): Nothing =
     throw NoSuchElementException(message)
 

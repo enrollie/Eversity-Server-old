@@ -11,9 +11,9 @@ import by.enrollie.eversity.database.functions.checkToken
 import by.enrollie.eversity.database.functions.getUserType
 import by.enrollie.eversity.security.EversityJWT
 import by.enrollie.eversity.security.User
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.auth.jwt.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
 
 fun Application.configureAuthentication() {
     install(Authentication) {

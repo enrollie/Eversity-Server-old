@@ -26,6 +26,8 @@ fun initXodusDatabase(storeDir: File): TransientEntityStore {
         XodusClass,
         XodusClassTimetable,
         XodusParentProfile,
+        XodusPersistentSchoolClassRoleType,
+        XodusPersistentSchoolClassRole,
         XodusPupilProfile,
         XodusSchoolsBy,
         XodusTeacherProfile,

@@ -14,9 +14,8 @@ import by.enrollie.eversity.database.functions.insertAbsences
 import by.enrollie.eversity.database.functions.insertDummyAbsences
 import by.enrollie.eversity.launchPeriodicAsync
 import io.ktor.client.*
-import io.ktor.client.features.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,8 +81,8 @@ class EversityPlacer {
                         socketTimeoutMillis = TimeUnit.SECONDS.toMillis(30.toLong())
                     }
                 }.use {
-                    it.get<HttpResponse> {
-                        url.takeFrom(configSubdomainURL!!)
+                    it.get {
+                        url.takeFrom(configSubdomainURL)
                     }
                 }
                 response.status == HttpStatusCode.OK

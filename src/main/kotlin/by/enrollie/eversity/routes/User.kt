@@ -7,18 +7,20 @@
 
 package by.enrollie.eversity.routes
 
+import by.enrollie.eversity.OSO
 import by.enrollie.eversity.controllers.PluginProvider
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.data_functions.join
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.security.User
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.features.*
+import by.enrollie.eversity.uac.OsoUser
 import io.ktor.http.*
-import io.ktor.request.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
@@ -37,9 +39,11 @@ private data class UserInfo(
 
 private fun Route.usersRoute() {
     get {
+        val user = call.authentication.principal<User>()!!
         val routeUserID =
             call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                 ?: throw ParameterConversionException("userId", "userId")
+        OSO.authorize(OsoUser(user.id, user.type), "read", OsoUser(routeUserID, getUserType(routeUserID)))
         val userData = getUserInfo(routeUserID) ?: return@get call.respond(
             HttpStatusCode.NotFound,
             ErrorResponse.userNotFound(routeUserID)
@@ -54,9 +58,11 @@ private fun Route.usersRoute() {
 private fun Route.userTimetable() {
     route("/timetable") {
         get {
+            val user = call.authentication.principal<User>()!!
             val routeUserID =
                 call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                     ?: throw ParameterConversionException("userId", "userId")
+            OSO.authorize(OsoUser(user.id, user.type), "read", OsoUser(routeUserID, getUserType(routeUserID)))
             return@get when (getUserType(routeUserID)) {
                 UserType.Teacher, UserType.Administration -> {
                     call.respond(getTeacherTimetable(routeUserID).asJsonElement)
@@ -87,9 +93,11 @@ private fun Route.userTimetable() {
         }
         route("/today") {
             get {
+                val user = call.authentication.principal<User>()!!
                 val routeUserID = call.parameters["userId"]?.toIntOrNull()
                     ?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                     ?: throw ParameterConversionException("userId", "userId")
+                OSO.authorize(OsoUser(user.id, user.type), "read", OsoUser(routeUserID, getUserType(routeUserID)))
                 if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value)
                     return@get call.respond(Json.encodeToJsonElement<Array<Lesson>>(arrayOf()))
                 return@get when (getUserType(routeUserID)) {
@@ -108,9 +116,11 @@ private fun Route.userTimetable() {
                 }
             }
             get("/current") {
+                val user = call.authentication.principal<User>()!!
                 val routeUserID = call.parameters["userId"]?.toIntOrNull()
                     ?.evaluateToUserID(call.authentication.principal<User>()!!.id)
                     ?: throw ParameterConversionException("userId", "userId")
+                OSO.authorize(OsoUser(user.id, user.type), "read", OsoUser(routeUserID, getUserType(routeUserID)))
                 if (DateTime.now().dayOfWeek == DayOfWeek.SUNDAY.value)
                     return@get call.respond(Json.encodeToJsonElement<Lesson?>(null))
                 val lessonsList = when (getUserType(routeUserID)) {
@@ -150,12 +160,13 @@ private data class IntegrationRequest(val integrationId: String)
 private fun Route.userIntegrations() {
     route("/integrations") {
         get {
-            val userJWT = call.principal<User>()!!
+            val user = call.principal<User>()!!
             val routeUserID =
-                call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+                call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
                     ?: throw ParameterConversionException("userId", "userId")
-            if (userJWT.type != UserType.SYSTEM && routeUserID != userJWT.id)
-                return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
+            OSO.authorize(OsoUser(user.id, user.type),
+                "read_integrations",
+                OsoUser(routeUserID, getUserType(routeUserID)))
             val availableIntegrations = PluginProvider.getAvailableIntegrationsForUser(routeUserID)
             val connectedIntegrations = PluginProvider.getRegisteredIntegrations(routeUserID)
             call.respond(availableIntegrations.map { integration ->
@@ -168,9 +179,10 @@ private fun Route.userIntegrations() {
         }
         put {
             val integrationRequest = call.receive<IntegrationRequest>()
-            val userJWT = call.principal<User>()!!
-            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+            val user = call.principal<User>()!!
+            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
                 ?: throw ParameterConversionException("userId", "userId")
+            OSO.authorize(OsoUser(user.id, user.type), "create_integrations", OsoUser(userID, getUserType(userID)))
             val availableIntegrations = PluginProvider.getAvailableIntegrationsForUser(userID)
             if (availableIntegrations.find { it.metadata.id == integrationRequest.integrationId } == null)
                 return@put call.respond(
@@ -194,10 +206,11 @@ private fun Route.userIntegrations() {
             )
         }
         delete {
-            val integrationRequest = call.receive<IntegrationRequest>()
-            val userJWT = call.principal<User>()!!
-            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(userJWT.id)
+            val user = call.principal<User>()!!
+            val userID = call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
                 ?: throw ParameterConversionException("userId", "userId")
+            OSO.authorize(OsoUser(user.id, user.type), "delete_integrations", OsoUser(userID, getUserType(userID)))
+            val integrationRequest = call.receive<IntegrationRequest>()
             val integrations = PluginProvider.getRegisteredIntegrations(userID)
             if (integrations.find { it.metadata.id == integrationRequest.integrationId } == null)
                 return@delete call.respond(

@@ -8,25 +8,23 @@
 package by.enrollie.eversity.routes
 
 import by.enrollie.eversity.AbsencePlacer
+import by.enrollie.eversity.OSO
 import by.enrollie.eversity.controllers.AuthController
 import by.enrollie.eversity.data_classes.ErrorResponse
 import by.enrollie.eversity.data_classes.UserID
-import by.enrollie.eversity.data_classes.UserType
 import by.enrollie.eversity.data_classes.evaluateToUserID
-import by.enrollie.eversity.database.functions.doesUserExist
-import by.enrollie.eversity.database.functions.getUserTokensCount
-import by.enrollie.eversity.database.functions.invalidateAllTokens
-import by.enrollie.eversity.database.functions.invalidateSingleToken
+import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.exceptions.AuthorizationUnsuccessful
 import by.enrollie.eversity.security.User
+import by.enrollie.eversity.uac.OsoUser
 import com.neitex.SchoolsByUnavailable
-import io.ktor.application.*
-import io.ktor.auth.*
-import io.ktor.features.*
 import io.ktor.http.*
-import io.ktor.request.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.plugins.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 
@@ -89,11 +87,13 @@ private fun Route.authLogin() {
 private fun Route.tokens() {
     delete {
         val user = call.principal<User>()!!
+        OSO.authorize(OsoUser(user.id, user.type), "invalidate_tokens", OsoUser(user.id, user.type))
         invalidateAllTokens(user.id)
         call.respond(HttpStatusCode.OK, "")
     }
     delete("/current") {
         val user = call.principal<User>()!!
+        OSO.authorize(OsoUser(user.id, user.type), "invalidate_tokens", OsoUser(user.id, user.type))
         invalidateSingleToken(user.id, user.token)
         call.respond(HttpStatusCode.OK, "")
     }
@@ -112,8 +112,7 @@ fun Route.authRoute() {
                     val userID: UserID =
                         call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
                             ?: throw ParameterConversionException("userId", "Int")
-                    if (user.type != UserType.SYSTEM && userID != user.id)
-                        return@get call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
+                    OSO.authorize(OsoUser(user.id, user.type), "read_tokens", OsoUser(userID, getUserType(userID)))
                     call.respond(HttpStatusCode.OK, "{\"count\":${getUserTokensCount(userID)}}")
                 }
                 delete {
@@ -121,10 +120,11 @@ fun Route.authRoute() {
                     val userID: UserID =
                         call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
                             ?: throw ParameterConversionException("userId", "Int")
-                    if (user.type != UserType.SYSTEM && userID != user.id)
-                        return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse.forbidden)
                     if (!doesUserExist(userID))
                         return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse.userNotFound(userID))
+                    OSO.authorize(OsoUser(user.id, user.type),
+                        "invalidate_tokens",
+                        OsoUser(userID, getUserType(userID)))
                     invalidateAllTokens(userID)
                     call.respond(HttpStatusCode.OK)
                 }
