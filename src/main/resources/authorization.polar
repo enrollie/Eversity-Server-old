@@ -36,9 +36,9 @@ resource SchoolClass{
 
 has_permission(_:User, "read", _:SchoolClass);
 
-has_relation(_: School, "school", _: SchoolClass);
+has_relation(Sch: School, "school", _: SchoolClass);
 
-has_role(user: User, role_name: String, _school: School) if
+has_role(user: User, role_name: String, _: School) if
     user.type() = role_name;
 
 has_role(user: User, role_name: String, schoolClass: SchoolClass) if
@@ -49,27 +49,32 @@ has_role(user: User, role_name: String, schoolClass: SchoolClass) if
 allow(user: User, action: String, schoolClass: SchoolClass) if
     has_permission(user, action, schoolClass);
 
+allow(user: User, action: String, Sch: School) if
+    has_permission(user, action, Sch);
+
+allow(user: User, action: String, school : School) if
+    has_permission(user, action, school);
 
 allow(user: User, "read", targetUser: User) if
     user.id() = targetUser.id() or
     user.anyMutualClasses(targetUser.classesRoles())  or
-    has_permission(user, "read_all_profiles", School);
+    has_permission(user, "read_all_profiles", Sch);
 
 allow(user: User, "invalidate_tokens", targetUser: User) if
     user.id() = targetUser.id() or
-    has_permission(user, "modify_system", School);
+    has_permission(user, "modify_system", Sch);
 
 allow(user: User, "read_tokens", targetUser: User) if 
     user.id() = targetUser.id() or
-    has_permission(user, "modify_system", School);
+    has_permission(user, "modify_system", Sch);
 
 allow(user: User, "read_integrations", targetUser: User) if
     user.id() = targetUser.id() or
-    has_permission(user, "modify_system", School);
+    has_permission(user, "modify_system", Sch);
 
 allow(user: User, "delete_integrations", targetUser: User) if
     user.id() = targetUser.id() or
-    has_permission(user, "modify_system", School);
+    has_permission(user, "modify_system", Sch);
 
 allow(user: User, "create_integrations", targetUser: User) if
     user.id() = targetUser.id();

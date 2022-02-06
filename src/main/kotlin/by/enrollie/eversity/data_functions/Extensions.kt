@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.data_functions
 
+import org.joda.time.LocalTime
 import org.joda.time.format.DateTimeFormatter
 import java.text.ParseException
 import java.text.SimpleDateFormat
@@ -23,7 +24,7 @@ fun SimpleDateFormat.tryToParse(string: String) = try {
 }
 
 fun DateTimeFormatter.tryToParse(string: String) = try {
-    this.parseDateTime(string)
+    this.parseDateTime(string).withTime(LocalTime.MIDNIGHT)
 } catch (e: IllegalArgumentException) {
     null
 }

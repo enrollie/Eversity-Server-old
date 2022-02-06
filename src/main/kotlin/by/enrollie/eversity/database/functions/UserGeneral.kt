@@ -9,42 +9,20 @@ package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.*
+import by.enrollie.eversity.database.clearAllCaches
 import by.enrollie.eversity.database.usersCache
 import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusSchoolsBy
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
+import by.enrollie.eversity.database.xodus_definitions.XodusUserType
 import by.enrollie.eversity.exceptions.NoSuchUserException
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
+import org.slf4j.LoggerFactory
 
-private fun getUserData(userID: UserID) = XodusUser.query(XodusUser::id eq userID).firstOrNull()?.let {
-    when (it.type.toEnum()) {
-        UserType.Teacher, UserType.Administration -> {
-            Teacher(it.id, it.firstName, it.middleName, it.lastName)
-        }
-        UserType.Pupil -> {
-            Pupil(
-                it.id,
-                it.firstName,
-                it.middleName,
-                it.lastName,
-                (it.profile as XodusPupilProfile).schoolClass.id
-            )
-        }
-        UserType.Parent -> {
-            Parent(it.id, it.firstName, it.middleName, it.lastName)
-        }
-        UserType.SYSTEM, UserType.Social -> {
-            object : User {
-                override val id: Int = it.id
-                override val type: UserType = UserType.SYSTEM
-                override val firstName: String = it.firstName
-                override val middleName: String? = it.middleName
-                override val lastName: String = it.lastName
-            }
-        }
-    }
-}
+private val logger by lazy { LoggerFactory.getLogger("UsersDatabase") }
+
+private fun getUserData(userID: UserID) = XodusUser.query(XodusUser::id eq userID).firstOrNull()?.toUser()
 
 /**
  * Checks, whether user exists
@@ -134,4 +112,67 @@ fun getUserName(userID: UserID, store: TransientEntityStore = DATABASE): UserNam
 
 fun deleteSchoolsByCredentials(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
     XodusSchoolsBy.query(XodusSchoolsBy::user.matches(XodusUser::id eq userID)).firstOrNull()?.delete()
+}
+
+private fun XodusUser.toUser(): User = when (this.type.toEnum()) {
+    UserType.Teacher -> {
+        Teacher(this.id, this.firstName, this.middleName, this.lastName)
+    }
+    UserType.Administration -> {
+        Administration(id, firstName, middleName, lastName)
+    }
+    UserType.Pupil -> {
+        Pupil(
+            this.id,
+            this.firstName,
+            this.middleName,
+            this.lastName,
+            (this.profile as XodusPupilProfile).schoolClass.id
+        )
+    }
+    UserType.Parent -> {
+        Parent(this.id, this.firstName, this.middleName, this.lastName)
+    }
+    UserType.SYSTEM, UserType.Social -> {
+        object : User {
+            override val id: Int = this@toUser.id
+            override val type: UserType = this@toUser.type.toEnum()
+            override val firstName: String = this@toUser.firstName
+            override val middleName: String? = this@toUser.middleName
+            override val lastName: String = this@toUser.lastName
+        }
+    }
+}
+
+/**
+ * Returns list of all registered users
+ */
+fun getAllUsers(store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusUser.all().toList().map {
+        it.toUser()
+    }
+}
+
+/**
+ * Applies new user data and discards previous, based on user ID
+ * **Warning!** Does not check for any constraints and will just apply any given changes, even if they are breaking
+ */
+fun applyUserDataEdits(newUserData: User, store: TransientEntityStore = DATABASE) = store.transactional {
+    XodusUser.query(XodusUser::id eq newUserData.id).first().apply {
+        firstName = newUserData.firstName
+        middleName = newUserData.middleName
+        lastName = newUserData.lastName
+        type = XodusUserType.fromEnum(newUserData.type)
+    }
+    clearAllCaches()
+}
+
+/**
+ * Removes user from database (with dependent entities, like profiles and classes)
+ */
+fun deleteUser(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
+    logger.info("Deleting user with ID $userID...")
+    XodusUser.query(XodusUser::id eq userID).first().delete()
+    logger.debug("User with ID $userID deleted, clearing caches...")
+    clearAllCaches()
 }

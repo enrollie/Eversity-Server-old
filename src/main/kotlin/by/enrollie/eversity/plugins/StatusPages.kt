@@ -33,5 +33,8 @@ fun Application.installExceptionStatus() {
         exception<ContentTransformationException> {
             call.respond(HttpStatusCode.NotFound, ErrorResponse.genericDeserializationException)
         }
+        exception<MissingRequestParameterException> {
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse.missingQueryParameter)
+        }
     }
 }

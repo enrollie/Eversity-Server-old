@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.database.xodus_definitions
 
+import by.enrollie.eversity.data_classes.SchoolClass
 import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.*
 import kotlinx.dnq.link.OnDeletePolicy
@@ -25,4 +26,5 @@ class XodusClass(entity: Entity) : XdEntity(entity) {
         onTargetDelete = OnDeletePolicy.CLEAR
     )
     val pupils by xdLink0_N(XodusPupilProfile)
+    fun toSchoolClass(): SchoolClass = SchoolClass(id, classTitle, isSecondShift, classTeacher.user.id)
 }

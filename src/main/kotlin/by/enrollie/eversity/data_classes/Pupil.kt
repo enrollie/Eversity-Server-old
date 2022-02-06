@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.data_classes
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -17,6 +18,7 @@ data class Pupil(
     override val lastName: String,
     val classID: Int,
 ) : User {
+    @SerialName("userType")
     override val type: UserType = UserType.Pupil
 }
 

@@ -1,0 +1,34 @@
+<!--
+  ~ Copyright © 2021 - 2022.
+  ~ Author: Pavel Matusevich.
+  ~ Licensed under GNU AGPLv3.
+  ~ All rights are reserved.
+  -->
+
+<configuration>
+    <appender name="TERMINAL" class="by.enrollie.eversity.logback.JLineCompatibleAppender"/>
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/logFile.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>logs/logFile.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy
+                    class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- or whenever the file size reaches 50MB -->
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <!-- keep 30 days' worth of history -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <charset>UTF-8</charset>
+            <layout class="by.enrollie.eversity.logback.IntelliJLikeLayoutWithoutColors">
+                <!--                <pattern>%d{YYYY-MM-dd HH:mm:ss,SSS} %thread   %level - %logger - %msg</pattern>-->
+            </layout>
+        </encoder>
+    </appender>
+    <root level="DEBUG">
+        <appender-ref ref="TERMINAL"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

@@ -11,6 +11,7 @@ import by.enrollie.eversity.database.xodus_definitions.XodusParentProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 
@@ -21,6 +22,7 @@ class Parent(
     override val middleName: String?,
     override val lastName: String
 ) : User {
+    @SerialName("userType")
     override val type: UserType = UserType.Parent
 
     fun getPupils(store: TransientEntityStore): Array<Pupil>? = store.transactional {

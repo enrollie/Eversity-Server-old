@@ -9,19 +9,18 @@
 
 package by.enrollie.eversity
 
-import by.enrollie.eversity.controllers.LocalLoginIssuer
+import by.enrollie.eversity.administration.Configurator
+import by.enrollie.eversity.administration.dispatcher
 import by.enrollie.eversity.controllers.PluginProvider
 import by.enrollie.eversity.data_classes.SchoolNameDeclensions
 import by.enrollie.eversity.database.initXodusDatabase
+import by.enrollie.eversity.database.xodus_definitions.XodusAppData
 import by.enrollie.eversity.placer.EversityPlacer
 import by.enrollie.eversity.plugins.configureAuthentication
 import by.enrollie.eversity.plugins.configureBanner
 import by.enrollie.eversity.plugins.configureHTTP
 import by.enrollie.eversity.plugins.installExceptionStatus
-import by.enrollie.eversity.routes.absenceRoute
-import by.enrollie.eversity.routes.authRoute
-import by.enrollie.eversity.routes.classRoute
-import by.enrollie.eversity.routes.userRoute
+import by.enrollie.eversity.routes.*
 import by.enrollie.eversity.schools_by.CredentialsChecker
 import by.enrollie.eversity.security.EversityJWT
 import by.enrollie.eversity.uac.OsoSchoolClass
@@ -30,6 +29,9 @@ import by.enrollie.eversity.uac.School
 import by.enrollie.eversity_plugins.plugin_api.SemVer
 import by.enrollie.eversity_plugins.plugin_api.ServerConfiguration
 import by.enrollie.eversity_plugins.plugin_api.TPIntegration
+import com.github.ajalt.mordant.rendering.TextColors
+import com.github.ajalt.mordant.rendering.TextStyles
+import com.mojang.brigadier.exceptions.CommandSyntaxException
 import com.neitex.SchoolsByParser
 import com.osohq.oso.Oso
 import io.ktor.http.cio.websocket.*
@@ -41,18 +43,25 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.coroutines.*
-import kotlinx.dnq.XdModel
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
+import org.jline.reader.*
+import org.jline.reader.impl.completer.StringsCompleter
+import org.jline.terminal.TerminalBuilder
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.DateTimeFormatter
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.awt.Toolkit
 import java.io.File
 import java.lang.module.ModuleFinder
+import java.net.InetAddress
+import java.nio.charset.Charset
 import java.nio.file.Paths
 import java.time.Duration
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.io.path.createDirectory
 import kotlin.io.path.notExists
+
 
 var EVERSITY_PUBLIC_NAME = "Eversity "
     private set
@@ -66,13 +75,12 @@ lateinit var SchoolsCredentialsChecker: CredentialsChecker
     private set
 lateinit var SCHOOL_NAME: SchoolNameDeclensions
     private set
-lateinit var SCHOOL_WEBSITE: String
-    private set
-lateinit var LOCAL_ACCOUNT_ISSUER: LocalLoginIssuer
-    private set
 lateinit var DATABASE: TransientEntityStore
     private set
 lateinit var OSO: Oso
+    private set
+val DefaultDateFormatter: DateTimeFormatter = DateTimeFormat.forPattern(DATE_FORMAT)
+lateinit var SERVER_CONFIGURATION: by.enrollie.eversity.database.xodus_definitions.ServerConfiguration
     private set
 
 /**
@@ -88,11 +96,88 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: suspend () ->
         }
     }
 
-lateinit var configSubdomainURL: String
-    private set
+object CLI {
+    val completer = StringsCompleter()
+    val logger: Logger = LoggerFactory.getLogger("CLI")
+    private val prompt = "eversity@${InetAddress.getLocalHost().hostName} :> "
+    private var isRunning = false
+    private val terminal = TerminalBuilder.builder().system(true).name("Eversity Server").build()
+    val lineReader: LineReader = LineReaderBuilder.builder().completer { reader, line, candidates ->
+        candidates.addAll(dispatcher.getCompletionSuggestions(dispatcher.parse(line.line(), "")).get().list.map {
+            Candidate(it.text)
+        })
+    }
+        .appName("Eversity Server").terminal(terminal).build()
+    private var job: Job? = null
 
+    private class Console {
+        fun startReader() {
+            try {
+                var line: String
+                while (isRunning) {
+                    line = try {
+                        lineReader.readLine(prompt)
+                    } catch (_: EndOfFileException) {
+                        continue
+                    }
+                    processInput(line)
+                }
+            } catch (e: UserInterruptException) {
+                stop()
+                return
+            }
+        }
 
-fun main(args: Array<String>): Unit = EngineMain.main(args)
+        private fun processInput(input: String) {
+            if (input.isBlank()) {
+                Toolkit.getDefaultToolkit().beep()
+                return
+            }
+            try {
+                val result = dispatcher.parse(input.trimStart().trimEnd(), "cli")
+                dispatcher.execute(result)
+            } catch (e: RuntimeException) {
+                lineReader.printAbove(TextColors.red("ERROR ") + TextColors.white(TextStyles.italic("(during execution)")) + ": " + e.message)
+            } catch (e: CommandSyntaxException) {
+                lineReader.printAbove(TextColors.red("ERROR") + ": Brigadier did not recognize this command")
+            }
+        }
+    }
+
+    fun start() {
+        require(!isRunning) { "CLI Reader cannot be started more than one time" }
+        isRunning = true
+        job = CoroutineScope(Dispatchers.IO).launch {
+            Console().startReader()
+        }
+    }
+
+    fun stop() {
+        require(isRunning) { "CLI Reader is not running" }
+        isRunning = false
+        terminal.writer().println("Stopping...")
+        terminal.close()
+        Runtime.getRuntime().exit(0)
+        job?.cancel("Stopped")
+    }
+}
+
+fun main(args: Array<String>) {
+    LoggerFactory.getLogger("Bootstrap").debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
+    run {
+        val databasePath = System.getenv("DATABASE_PATH")!!
+        DATABASE = initXodusDatabase(File(databasePath))
+        if (!DATABASE.transactional(readonly = true) {
+                XodusAppData.get().isInitialized
+            })
+            Configurator(DATABASE).beginConfig()
+    }
+    SERVER_CONFIGURATION = DATABASE.transactional(readonly = true) {
+        XodusAppData.get().usableConfiguration
+    }
+    CLI.start()
+    EngineMain.main(args)
+}
 
 fun Application.registerRoutes() {
     routing {
@@ -100,6 +185,7 @@ fun Application.registerRoutes() {
         userRoute()
         classRoute()
         absenceRoute()
+        templatingRoute()
     }
 }
 
@@ -123,7 +209,6 @@ fun Application.module() {
         EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
         EVERSITY_BUILD_DATE = props.getProperty("buildDate")
     }
-    log.debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
     kotlin.run {
         val namingFileName = System.getenv("SCHOOL_NAMING_FILE")
         val namingFile = File(namingFileName)
@@ -142,31 +227,10 @@ fun Application.module() {
         }
     }
     configureBanner()
-//JWT generator initialization
-    val secretJWT = this.environment.config.config("jwt").property("secret").getString()
-    EversityJWT.initialize(secretJWT)
+    EversityJWT.initialize(SERVER_CONFIGURATION.jwtSecretKey)
 
-    DATABASE =
-        initXodusDatabase(File(environment.config.config("database").property("path").getString()))
-    println(XdModel.hierarchy)
-    println(DATABASE.modelMetaData!!.entitiesMetaData.joinToString { "$it;; " })
-
-    configSubdomainURL = environment.config.config("schools").property("subdomain").getString()
-
-    SCHOOL_WEBSITE = environment.config.config("school").property("website").getString()
     AbsencePlacer = EversityPlacer()
-    SchoolsCredentialsChecker =
-        CredentialsChecker(
-            environment.config.config("eversity").property("autoCredentialsRecheck").getString().toInt(),
-            LoggerFactory.getLogger("Schools.by")
-        )
-    kotlin.run {
-        val localFile = File(environment.config.config("eversity").property("localAccountsFilePath").getString())
-        LOCAL_ACCOUNT_ISSUER = if (!localFile.exists()) {
-            log.warn("Local accounts file is not available at path \'${localFile.absolutePath}\'! No local accounts will be available")
-            LocalLoginIssuer(mapOf())
-        } else LocalLoginIssuer(Json.decodeFromString(localFile.readText()))
-    }
+    SchoolsCredentialsChecker = CredentialsChecker(15, LoggerFactory.getLogger("SchoolsByChecker"))
 
     val plugins = run {
         val pluginsDir = Paths.get("plugins")
@@ -186,7 +250,7 @@ fun Application.module() {
         ServerConfiguration(
             SemVer.parse(
                 EVERSITY_VERSION.removePrefix("v").replaceAfter("-", "").removeSuffix("-")
-            ), SCHOOL_WEBSITE, configSubdomainURL
+            ), SERVER_CONFIGURATION.schoolWebsite, SERVER_CONFIGURATION.schoolSubdomain
         )
     )
     runBlocking {
@@ -194,13 +258,16 @@ fun Application.module() {
             PluginProvider.registerPlugin(it)
         }
     }
-    SchoolsByParser.setSubdomain(configSubdomainURL)
+    SchoolsByParser.setSubdomain(SERVER_CONFIGURATION.schoolSubdomain)
     run { //Load Oso
         OSO = Oso()
-        OSO.registerClass(School::class.java, "School")
         OSO.registerClass(OsoSchoolClass::class.java, "SchoolClass")
         OSO.registerClass(OsoUser::class.java, "User")
-        OSO.loadFiles(arrayOf("src/main/oso/authorization.polar"))
+        OSO.registerClass(School::class.java, "School")
+        OSO.registerConstant(School(), "Sch")
+        val polarFile = this.javaClass.getResourceAsStream("/authorization.polar")!!.readAllBytes()
+            .toString(Charset.defaultCharset())
+        OSO.loadStr(polarFile)
     }
     installExceptionStatus()
     configureAuthentication()

@@ -22,10 +22,12 @@ import kotlinx.dnq.query.*
  * @return Class ID
  * @throws IllegalArgumentException Thrown, if user was not found in pupils list
  */
-fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): Int = store.transactional(readonly = true) {
-    XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq userID)).firstOrNull()?.schoolClass?.id
-        ?: throw IllegalArgumentException("Pupil with ID $userID does not exist")
-}
+fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): SchoolClass =
+    store.transactional(readonly = true) {
+        XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq userID))
+            .firstOrNull()?.schoolClass?.toSchoolClass()
+            ?: throw IllegalArgumentException("Pupil with ID $userID does not exist")
+    }
 
 /**
  * Returns all pupils in given class

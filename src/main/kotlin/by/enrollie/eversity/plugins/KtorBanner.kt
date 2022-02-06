@@ -40,7 +40,7 @@ fun Application.configureBanner() {
             }
         }
         render {
-            Terminal().println(TextColors.red(it.text))
+            Terminal().println(TextColors.rgb(194, 1, 20)(it.text))
         }
         afterBanner { banner ->
             val title = " $EVERSITY_PUBLIC_NAME "

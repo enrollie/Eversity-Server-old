@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.routes
 
-import by.enrollie.eversity.DATE_FORMAT
+import by.enrollie.eversity.DefaultDateFormatter
 import by.enrollie.eversity.OSO
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.AbsenceStatisticsPackage
@@ -30,7 +30,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.joda.time.LocalDate
 import org.joda.time.LocalTime
-import org.joda.time.format.DateTimeFormat
 
 @Serializable
 private data class ShortAbsenceResponse(
@@ -53,9 +52,9 @@ private fun Route.statistics() {
     route("/statistics") {
         get {
             val user = call.authentication.principal<User>()!!
-            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
+            OSO.authorize(OsoUser(user.user.id, user.user.type), "read_whole_absence", School())
             val date = call.request.queryParameters["date"]?.let {
-                DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
+                DefaultDateFormatter.tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
                     ?: throw ParameterConversionException("date",
                         "date")
             } ?: LocalDate.now().toDateTime(LocalTime.MIDNIGHT)
@@ -67,9 +66,9 @@ private fun Route.statistics() {
         }
         get("/detailed") {
             val user = call.authentication.principal<User>()!!
-            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
+            OSO.authorize(OsoUser(user.user.id, user.user.type), "read_whole_absence", School())
             val date = call.request.queryParameters["date"]?.let {
-                DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
+                DefaultDateFormatter.tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
                     ?: throw ParameterConversionException("date",
                         "date")
             } ?: LocalDate.now().toDateTime(LocalTime.MIDNIGHT)
@@ -90,9 +89,9 @@ private fun Route.noData() {
     route("/noData") {
         get {
             val user = call.authentication.principal<User>()!!
-            OSO.authorize(OsoUser(user.id, user.type), "read_whole_absence", School())
+            OSO.authorize(OsoUser(user.user.id, user.user.type), "read_whole_absence", School())
             val date = call.request.queryParameters["date"]?.let {
-                DateTimeFormat.forPattern(DATE_FORMAT).tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
+                DefaultDateFormatter.tryToParse(it)?.withTime(LocalTime.MIDNIGHT)
                     ?: throw ParameterConversionException("date",
                         "date")
             } ?: LocalDate.now().toDateTime(LocalTime.MIDNIGHT)

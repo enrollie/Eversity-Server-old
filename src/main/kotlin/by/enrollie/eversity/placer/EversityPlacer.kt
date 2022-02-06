@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.placer
 
-import by.enrollie.eversity.configSubdomainURL
+import by.enrollie.eversity.SERVER_CONFIGURATION
 import by.enrollie.eversity.data_classes.Absence
 import by.enrollie.eversity.data_classes.DummyAbsence
 import by.enrollie.eversity.database.functions.insertAbsences
@@ -82,7 +82,7 @@ class EversityPlacer {
                     }
                 }.use {
                     it.get {
-                        url.takeFrom(configSubdomainURL)
+                        url.takeFrom(SERVER_CONFIGURATION.schoolSubdomain)
                     }
                 }
                 response.status == HttpStatusCode.OK

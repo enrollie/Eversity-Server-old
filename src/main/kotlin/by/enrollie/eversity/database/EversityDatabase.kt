@@ -10,10 +10,12 @@
 package by.enrollie.eversity.database
 
 import by.enrollie.eversity.data_classes.*
+import by.enrollie.eversity.uac.clearAuthorizationCache
 import by.enrollie.eversity_plugins.plugin_api.Database
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import org.joda.time.DateTime
+import org.slf4j.LoggerFactory
 import java.time.Duration
 
 val tokensCache: Cache<Pair<UserID, String>, Boolean> =
@@ -28,6 +30,17 @@ val teacherTimetableCache: Cache<UserID, TwoShiftsTimetable> =
     Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).maximumSize(100).recordStats().build()
 val absenceStatisticsCache: Cache<DateTime, Pair<AbsenceStatisticsPackage, AbsenceStatisticsPackage>> =
     Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(2)).maximumSize(10).recordStats().build()
+
+fun clearAllCaches() {
+    LoggerFactory.getLogger("CaffeineCaches").info("Clearing caches... ")
+    tokensCache.invalidateAll()
+    usersCache.invalidateAll()
+    classesCache.invalidateAll()
+    classTimetablesCache.invalidateAll()
+    teacherTimetableCache.invalidateAll()
+    absenceStatisticsCache.invalidateAll()
+    clearAuthorizationCache()
+}
 
 val databasePluginInterface = object : Database {
     override fun getUserInfo(userID: Int): by.enrollie.eversity_plugins.plugin_api.User? {

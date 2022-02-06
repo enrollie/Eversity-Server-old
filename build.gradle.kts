@@ -27,20 +27,7 @@ plugins {
 group = "by.enrollie.eversity"
 version = semver.info.toString().replace(Regex("\\.sha\\.[a-z0-9]{7}"), "")
 application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
-}
-
-fun getGitVersion(): String {
-    val os = org.apache.commons.io.output.ByteArrayOutputStream()
-    return try {
-        project.exec {
-            commandLine = "git describe --tags --long".split(" ")
-            standardOutput = os
-        }.rethrowFailure()
-        String(os.toByteArray()).trim()
-    } catch (e: org.gradle.process.internal.ExecException) {
-        "NON-GIT BUILD"
-    }
+    mainClass.set("by.enrollie.eversity.ApplicationKt")
 }
 
 repositories {
@@ -53,15 +40,31 @@ repositories {
         url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap")
         name = "ktor-eap"
     }
+    maven {
+        url = uri("https://libraries.minecraft.net")
+        name = "minecraft-libraries"
+    }
 }
 
 dependencies {
     implementation(project(":server-api"))
     //----KTOR DEPENDENCIES
-    implementation("org.apache.logging.log4j:log4j-api:2.17.0")
-    implementation("org.apache.logging.log4j:log4j-core:2.17.0")
-    implementation("org.apache.logging.log4j:log4j-slf4j-impl:2.17.0")
-    implementation("org.slf4j:slf4j-api:1.7.33")
+    implementation("io.ktor:ktor-server-auth:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
+    implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
+    implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
+    implementation("io.ktor:ktor-auth-jwt:$ktorVersion")
+    implementation("io.ktor:ktor-server-sessions:$ktorVersion")
+    implementation("io.ktor:ktor-server-host-common:$ktorVersion")
+    implementation("io.ktor:ktor-metrics:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-mock:$ktorVersion")
+    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     //----END OF KTOR DEPENDENCIES
 
     //----DATABASE DEPENDENCIES
@@ -74,21 +77,57 @@ dependencies {
     //----END OF DATABASE DEPENDENCIES
 
     //----REPORT DEPENDENCIES
-    implementation("fr.opensagres.xdocreport:template:2.0.2")
-    implementation("fr.opensagres.xdocreport:document:2.0.2")
-    implementation("fr.opensagres.xdocreport:template:2.0.2")
-    implementation("fr.opensagres.xdocreport:converter:2.0.2")
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.document.docx:2.0.2")
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.velocity:2.0.2")
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.freemarker:2.0.2")
-    implementation("org.apache.velocity:velocity:1.7")
-    implementation("org.apache.commons:commons-collections4:4.4")
-    implementation("org.apache.commons:commons-lang3:3.12.0")
-    implementation("oro:oro:2.0.8")
+    implementation("fr.opensagres.xdocreport:template:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:document:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:template:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:converter:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.document.docx:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.velocity:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.freemarker:2.0.2") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("org.apache.velocity:velocity:1.7") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("org.apache.commons:commons-collections4:4.4") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("org.apache.commons:commons-lang3:3.12.0") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
+    implementation("oro:oro:2.0.8") {
+        exclude("log4j")
+        exclude("org.slf4j")
+    }
     //----END OF REPORT DEPENDENCIES
 
 
     //----OTHER DEPENDENCIES
+    implementation("org.slf4j:slf4j-api:1.7.35")
+    implementation("ch.qos.logback:logback-core:1.2.10")
+    implementation("ch.qos.logback:logback-classic:1.2.10")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     implementation("com.osohq:oso:0.26.0")
     implementation("com.auth0:java-jwt:3.18.3")
@@ -115,23 +154,18 @@ dependencies {
     }
     implementation("net.swiftzer.semver:semver:1.2.0")
     implementation("joda-time:joda-time:2.10.13")
-    implementation("io.ktor:ktor-server-auth:$ktorVersion")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
-    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
-    implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
-    implementation("io.ktor:ktor-server-core:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-auth-jwt:$ktorVersion")
-    implementation("io.ktor:ktor-server-sessions:$ktorVersion")
-    implementation("io.ktor:ktor-server-host-common:$ktorVersion")
-    implementation("io.ktor:ktor-metrics:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-client-mock:$ktorVersion")
-    implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     //----END OF OTHER DEPENDENCIES
+
+    //----SHELL DEPENDENCIES
+    implementation("org.jline:jline:3.21.0")
+    implementation("org.jline:jline-reader:3.21.0")
+    implementation("org.jline:jline-terminal:3.21.0")
+    implementation("org.jline:jline-builtins:3.21.0")
+    implementation("org.jline:jline-console:3.21.0")
+    implementation("org.fusesource.jansi:jansi:2.4.0")
+    implementation("org.jline:jline-terminal-jansi:3.21.0")
+    implementation("com.mojang:brigadier:1.0.18")
+    //----END OF SHELL DEPENDENCIES
 
     //----TEST DEPENDENCIES
     testImplementation(kotlin("test-junit"))

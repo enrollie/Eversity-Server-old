@@ -55,5 +55,7 @@ data class ErrorResponse private constructor(val errorCode: String, val addition
             get() = ErrorResponse("NOT_FOUND", "Requested resource was not found")
         val genericDeserializationException: ErrorResponse
             get() = ErrorResponse("DESERIALIZATION_FAILURE", "Failed to deserialize input data")
+        val missingQueryParameter: ErrorResponse
+            get() = ErrorResponse("BAD_REQUEST", "Missing required query parameter")
     }
 }

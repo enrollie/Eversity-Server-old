@@ -87,14 +87,14 @@ private fun Route.authLogin() {
 private fun Route.tokens() {
     delete {
         val user = call.principal<User>()!!
-        OSO.authorize(OsoUser(user.id, user.type), "invalidate_tokens", OsoUser(user.id, user.type))
-        invalidateAllTokens(user.id)
+        OSO.authorize(OsoUser(user.user.id, user.user.type), "invalidate_tokens", OsoUser(user.user.id, user.user.type))
+        invalidateAllTokens(user.user.id)
         call.respond(HttpStatusCode.OK, "")
     }
     delete("/current") {
         val user = call.principal<User>()!!
-        OSO.authorize(OsoUser(user.id, user.type), "invalidate_tokens", OsoUser(user.id, user.type))
-        invalidateSingleToken(user.id, user.token)
+        OSO.authorize(OsoUser(user.user.id, user.user.type), "invalidate_tokens", OsoUser(user.user.id, user.user.type))
+        invalidateSingleToken(user.user.id, user.accessToken)
         call.respond(HttpStatusCode.OK, "")
     }
 }
@@ -110,19 +110,21 @@ fun Route.authRoute() {
                 get {
                     val user = call.principal<User>()!!
                     val userID: UserID =
-                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
+                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.user.id)
                             ?: throw ParameterConversionException("userId", "Int")
-                    OSO.authorize(OsoUser(user.id, user.type), "read_tokens", OsoUser(userID, getUserType(userID)))
+                    OSO.authorize(OsoUser(user.user.id, user.user.type),
+                        "read_tokens",
+                        OsoUser(userID, getUserType(userID)))
                     call.respond(HttpStatusCode.OK, "{\"count\":${getUserTokensCount(userID)}}")
                 }
                 delete {
                     val user = call.principal<User>()!!
                     val userID: UserID =
-                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.id)
+                        call.parameters["userId"]?.toIntOrNull()?.evaluateToUserID(user.user.id)
                             ?: throw ParameterConversionException("userId", "Int")
                     if (!doesUserExist(userID))
                         return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse.userNotFound(userID))
-                    OSO.authorize(OsoUser(user.id, user.type),
+                    OSO.authorize(OsoUser(user.user.id, user.user.type),
                         "invalidate_tokens",
                         OsoUser(userID, getUserType(userID)))
                     invalidateAllTokens(userID)

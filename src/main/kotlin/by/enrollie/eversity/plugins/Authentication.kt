@@ -8,7 +8,7 @@
 package by.enrollie.eversity.plugins
 
 import by.enrollie.eversity.database.functions.checkToken
-import by.enrollie.eversity.database.functions.getUserType
+import by.enrollie.eversity.database.functions.getUserInfo
 import by.enrollie.eversity.security.EversityJWT
 import by.enrollie.eversity.security.User
 import io.ktor.server.application.*
@@ -24,7 +24,7 @@ fun Application.configureAuthentication() {
                 val userID = jwtCredential.payload.getClaim("userID").asString().toIntOrNull()
                 val token = jwtCredential.payload.getClaim("token").asString()
                 return@validate if (userID != null && checkToken(userID, token)) {
-                    User(userID, getUserType(userID), token)
+                    User(getUserInfo(userID)!!, token)
                 } else {
                     null
                 }

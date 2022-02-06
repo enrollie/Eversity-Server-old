@@ -23,7 +23,7 @@ open class XodusTeacherProfile(entity: Entity) : XodusBaseUserProfile(entity) {
         }
     }
 
-    var schoolClass by xdLink0_1(XodusClass, onTargetDelete = OnDeletePolicy.CLEAR)
+    var schoolClass by xdLink0_1(XodusClass, onTargetDelete = OnDeletePolicy.CLEAR, onDelete = OnDeletePolicy.CASCADE)
 
     /**
      * Use Json.decodeFromString() with TwoShiftsTimetable type to get timetable

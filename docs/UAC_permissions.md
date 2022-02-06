@@ -35,13 +35,13 @@ administration-->social;
 
 ## User permissions in School
 
-| Permission name      | Description                                                                                         | Required lowest role |
-| -------------------- | --------------------------------------------------------------------------------------------------- |:--------------------:|
-| `modify_system`      | Gives user ability to modify system internals, such as database locations, Schools.by address, etc. | `system`             |
-| `read_whole_absence` | Gives user permission to read school-wide absence data                                              | `social`             |
-| `change_data`        | Gives user permission to redact school's data, such as school titles, pupils data, etc.             | `administration`     |
-| `read_all_profiles`  | Gives user permission to read **
-all** user profiles in system                                       | `social`             |
+| Permission name               | Description                                                                                         | Required lowest role |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- |:--------------------:|
+| `modify_system`               | Gives user ability to modify system internals, such as database locations, Schools.by address, etc. | `system`             |
+| `read_whole_absence`          | Gives user permission to read school-wide absence data                                              | `social`             |
+| `change_data`                 | Gives user permission to redact school's data, such as school titles, pupils data, etc.             | `administration`     |
+| `read_all_profiles`           | Gives user permission to read **                                                                    |                      |
+| all** user profiles in system | `social`                                                                                            |                      |
 
 ## User roles in SchoolClass
 

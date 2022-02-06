@@ -55,8 +55,15 @@ private val roleCache: Cache<UserID, List<OsoSchoolClassRole>> =
 
     }).build()
 
+/**
+ * Clears Oso roles cache
+ */
+fun clearAuthorizationCache() = roleCache.invalidateAll()
+
+@Suppress("MemberVisibilityCanBePrivate")
 class OsoUser(val id: UserID, private val userType: UserType) {
-    fun type() = userType.name.lowercase()
+    fun type(): String = userType.name.lowercase()
+
     fun id() = id
     fun classesRoles(): List<OsoSchoolClassRole> = roleCache.get(id) {
         val classesRoles = DATABASE.transactional(readonly = true) {
@@ -68,7 +75,7 @@ class OsoUser(val id: UserID, private val userType: UserType) {
         }.let {
             if (userType == UserType.Pupil)
                 (it ?: listOf()).plus(OsoSchoolClassRole(SchoolClassRoles.PUPIL,
-                    OsoSchoolClass(getPupilClass(id)), null))
+                    OsoSchoolClass(getPupilClass(id).id), null))
             else it ?: listOf()
         }.toMutableList()
         if (userType == UserType.Teacher || userType == UserType.Administration) {
@@ -102,9 +109,9 @@ class OsoUser(val id: UserID, private val userType: UserType) {
         classesRoles
     }
 
-    fun anyMutualClasses(second: List<OsoSchoolClassRole>): Boolean = second.let { it.map { it.schoolClass.id } }
-        .let { idList -> classesRoles().map { it.schoolClass.id }.any { idList.contains(it) } }
-
+    fun anyMutualClasses(second: List<OsoSchoolClassRole>): Boolean =
+        second.let { schoolClassRoles -> schoolClassRoles.map { it.schoolClass.id } }
+            .let { idList -> classesRoles().map { it.schoolClass.id }.any { idList.contains(it) } }
 }
 
 enum class SchoolClassRoles { CLASS_TEACHER, DATA_DELEGATE, LESSON_TEACHER, PUPIL }
