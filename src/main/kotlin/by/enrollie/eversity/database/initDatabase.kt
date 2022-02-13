@@ -18,8 +18,6 @@ fun initXodusDatabase(storeDir: File): TransientEntityStore {
     val models = arrayOf(
         XodusAbsence,
         XodusAbsenceReason,
-        XodusAbsenceNotes,
-        XodusAbsenceNoteType,
         XodusAdministrationProfile,
         XodusAppData,
         XodusBaseUserProfile,

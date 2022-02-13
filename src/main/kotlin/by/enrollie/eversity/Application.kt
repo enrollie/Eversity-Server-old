@@ -38,13 +38,13 @@ import io.ktor.http.cio.websocket.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
+import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.coroutines.*
 import org.jline.reader.*
-import org.jline.reader.impl.completer.StringsCompleter
 import org.jline.terminal.TerminalBuilder
 import org.joda.time.format.DateTimeFormat
 import org.joda.time.format.DateTimeFormatter
@@ -97,7 +97,6 @@ fun CoroutineScope.launchPeriodicAsync(repeatMillis: Long, action: suspend () ->
     }
 
 object CLI {
-    val completer = StringsCompleter()
     val logger: Logger = LoggerFactory.getLogger("CLI")
     private val prompt = "eversity@${InetAddress.getLocalHost().hostName} :> "
     private var isRunning = false
@@ -106,8 +105,7 @@ object CLI {
         candidates.addAll(dispatcher.getCompletionSuggestions(dispatcher.parse(line.line(), "")).get().list.map {
             Candidate(it.text)
         })
-    }
-        .appName("Eversity Server").terminal(terminal).build()
+    }.appName("Eversity Server").terminal(terminal).build()
     private var job: Job? = null
 
     private class Console {
@@ -162,21 +160,34 @@ object CLI {
     }
 }
 
-fun main(args: Array<String>) {
-    LoggerFactory.getLogger("Bootstrap").debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
+@Suppress("CAST_NEVER_SUCCEEDS")
+fun main() {
     run {
-        val databasePath = System.getenv("DATABASE_PATH")!!
-        DATABASE = initXodusDatabase(File(databasePath))
-        if (!DATABASE.transactional(readonly = true) {
-                XodusAppData.get().isInitialized
-            })
-            Configurator(DATABASE).beginConfig()
+        val props = Properties()
+        props.load(CLI::class.java.getResourceAsStream("/appInfo.properties"))
+        EVERSITY_VERSION = props.getProperty("appVersion")
+        EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
+        EVERSITY_BUILD_DATE = props.getProperty("buildDate")
     }
+    LoggerFactory.getLogger("Bootstrap").debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
+    val databasePath = System.getenv("DATABASE_PATH")
+        ?: error("Required system environment variable \"SCHOOL_NAMING_FILE\" is not defined!")
+    DATABASE = initXodusDatabase(File(databasePath))
+    if (!DATABASE.transactional(readonly = true) {
+            XodusAppData.get().isInitialized
+        }) Configurator(DATABASE).beginConfig()
     SERVER_CONFIGURATION = DATABASE.transactional(readonly = true) {
         XodusAppData.get().usableConfiguration
     }
     CLI.start()
-    EngineMain.main(args)
+    embeddedServer(Netty, port = SERVER_CONFIGURATION.port, module = { module() }, configure = {
+        callGroupSize = 50
+        workerGroupSize = 100
+        requestQueueLimit = 250
+        requestReadTimeoutSeconds = 5
+        responseWriteTimeoutSeconds = 5
+        runningLimit = 20
+    }).start(wait = true)
 }
 
 fun Application.registerRoutes() {
@@ -186,11 +197,10 @@ fun Application.registerRoutes() {
         classRoute()
         absenceRoute()
         templatingRoute()
+        schoolRoute()
     }
 }
 
-@Suppress("unused")
-// Referenced in application.conf
 fun Application.module() {
     install(io.ktor.server.plugins.ContentNegotiation) {
         json()
@@ -203,25 +213,21 @@ fun Application.module() {
         masking = false
     }
     kotlin.run {
-        val props = Properties()
-        props.load(this.javaClass.getResourceAsStream("/appInfo.properties"))
-        EVERSITY_VERSION = props.getProperty("appVersion")
-        EVERSITY_PUBLIC_NAME += EVERSITY_VERSION
-        EVERSITY_BUILD_DATE = props.getProperty("buildDate")
-    }
-    kotlin.run {
         val namingFileName = System.getenv("SCHOOL_NAMING_FILE")
+            ?: error("Required system environment variable \"SCHOOL_NAMING_FILE\" is not defined!")
         val namingFile = File(namingFileName)
         val props = Properties()
         props.load(namingFile.reader(charset("UTF-8")))
         try {
-            SCHOOL_NAME = SchoolNameDeclensions(props.getProperty("nominative"),
+            SCHOOL_NAME = SchoolNameDeclensions(
+                props.getProperty("nominative"),
                 props.getProperty("genitive"),
                 props.getProperty("accusative"),
                 props.getProperty("dative"),
                 props.getProperty("instrumental"),
                 props.getProperty("prepositional"),
-                props.getProperty("location"))
+                props.getProperty("location")
+            )
         } catch (e: NoSuchElementException) {
             throw ApplicationConfigurationException("School naming file error: ${e.message}")
         }

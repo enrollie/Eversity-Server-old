@@ -7,7 +7,6 @@
 
 package by.enrollie.eversity.placer.data_classes
 
-import by.enrollie.eversity.data_classes.AbsenceNoteWrapper
 import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.UserID
 import by.enrollie.eversity.serializers.DateSerializer
@@ -22,7 +21,5 @@ data class PlaceJob(
     val lessonsList: List<Short>,
     val reason: AbsenceReason?,
     @Serializable(DateSerializer::class)
-    val date: DateTime,
-    @SerialName("note")
-    val additionalNotes: AbsenceNoteWrapper? = null
+    val date: DateTime
 )

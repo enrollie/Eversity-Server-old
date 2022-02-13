@@ -29,7 +29,7 @@ class XodusAppData(entity: Entity) : XdEntity(entity) {
             schoolWebsite = "http://localhost.local/"
             baseDocumentUrl = "http://localhost.local/"
             schoolsBySubdomain = "https://demo.schools.by/"
-            rearmJWTSecretKey()
+            jwtSecretKey = getNewJWTKey()
         }
     }
 
@@ -58,21 +58,25 @@ class XodusAppData(entity: Entity) : XdEntity(entity) {
     """.trimIndent()
 
     val usableConfiguration: ServerConfiguration
-        get() = ServerConfiguration(port,
+        get() = ServerConfiguration(
+            port,
             jwtSecretKey,
             schoolsBySubdomain,
             File(documentTempDir),
             schoolWebsite,
             baseDocumentUrl,
-            documentsLifetime)
+            documentsLifetime
+        )
 
     fun rearmJWTSecretKey() {
         val logger = LoggerFactory.getLogger("AppConfig")
         logger.info("Rearming JWT Secret key...")
         logger.debug("Old JWT Secret key: $jwtSecretKey")
-        jwtSecretKey = RandomStringUtils.randomAlphanumeric(128)
+        jwtSecretKey = getNewJWTKey()
         logger.info("New JWT Secret key is issued, please, restart application to use new Secret key")
     }
+
+    private fun getNewJWTKey(): String = RandomStringUtils.randomAlphanumeric(128)
 }
 
 data class ServerConfiguration internal constructor(

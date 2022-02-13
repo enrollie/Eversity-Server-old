@@ -27,6 +27,8 @@ data class ErrorResponse private constructor(val errorCode: String, val addition
         )
 
         fun illegalDate(date: String) = ErrorResponse("ILLEGAL_DATE", "Date $date is illegal")
+        fun illegalLessonPlace(lessonPlace: Short) =
+            ErrorResponse("ILLEGAL_LESSON", "Lesson place $lessonPlace is illegal")
 
         fun conditionalMissingRequiredQuery(conditionParameter: String, parameter: String) =
             ErrorResponse(

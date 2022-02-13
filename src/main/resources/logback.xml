@@ -23,7 +23,6 @@
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <charset>UTF-8</charset>
             <layout class="by.enrollie.eversity.logback.IntelliJLikeLayoutWithoutColors">
-                <!--                <pattern>%d{YYYY-MM-dd HH:mm:ss,SSS} %thread   %level - %logger - %msg</pattern>-->
             </layout>
         </encoder>
     </appender>

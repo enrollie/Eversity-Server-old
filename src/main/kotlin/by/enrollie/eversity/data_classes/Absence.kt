@@ -9,14 +9,8 @@ package by.enrollie.eversity.data_classes
 
 import by.enrollie.eversity.serializers.DateSerializer
 import by.enrollie.eversity.serializers.DateTimeSerializer
-import kotlinx.serialization.Polymorphic
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.plus
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 import org.joda.time.DateTime
 
 @Serializable
@@ -34,37 +28,4 @@ data class Absence(
     @Serializable(DateTimeSerializer::class)
     @SerialName("lastEditTimestamp")
     val lastEdit: DateTime,
-    val additionalNote: AbsenceNoteWrapper?,
 )
-
-@Serializable
-enum class AbsenceNoteType { TEXT, ADDITIONAL_DATA }
-
-@Serializable
-data class AbsenceNoteWrapper(
-    val type: AbsenceNoteType,
-    @Polymorphic
-    val note: AbsenceNote,
-)
-
-interface AbsenceNote
-
-@Serializable
-@SerialName("TEXT")
-data class TextAbsenceNote(val message: String) : AbsenceNote
-
-@Serializable
-@SerialName("ADDITIONAL_DATA")
-data class DataAbsenceNote(
-    @SerialName("didLeaveAftermath")
-    val leftAftermath: Boolean? = null,
-) : AbsenceNote
-
-val AbsenceNoteJSON = Json {
-    serializersModule += SerializersModule {
-        polymorphic(AbsenceNote::class) {
-            subclass(DataAbsenceNote::class)
-            subclass(TextAbsenceNote::class)
-        }
-    }
-}

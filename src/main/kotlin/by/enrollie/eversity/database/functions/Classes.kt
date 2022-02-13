@@ -121,10 +121,8 @@ fun getClassStatistics(
                     it.sentBy?.id,
                     it.date,
                     it.reason.toAbsenceReason(),
-                    it.lessons.toList(),it.lastChangeDate,
-                    it.additionalNotes?.let { note ->
-                        AbsenceNoteJSON.decodeFromString(note.note)
-                    })
+                    it.lessons.toList(), it.lastChangeDate
+                )
             }
         )
     }
@@ -135,4 +133,13 @@ fun getClassStatistics(
         )
     }
     return resultList
+}
+
+/**
+ * Returns all school classes in database
+ */
+fun getAllClasses(store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusClass.all().toList().map {
+        SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id)
+    }
 }

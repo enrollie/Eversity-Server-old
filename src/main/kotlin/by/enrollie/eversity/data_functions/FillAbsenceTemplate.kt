@@ -34,11 +34,11 @@ fun fillAbsenceTemplate(
         val totalIll: Int,
         val totalHealing: Int,
         val totalRequest: Int,
-        val totalCompetition: Int,
+        val totalPrincipalDecision: Int,
         val totalUnknown: Int,
     ) {
         val totalAttended: Int
-            get() = totalPupils - (totalIll + totalHealing + totalRequest + totalCompetition + totalUnknown)
+            get() = totalPupils - (totalIll + totalHealing + totalRequest + totalPrincipalDecision + totalUnknown)
         val totalAttendedPercent: String
             get() = "${
                 String.format(
@@ -63,11 +63,11 @@ fun fillAbsenceTemplate(
                     "%.1f",
                     ((totalRequest.toDouble() / totalPupils.toDouble()) * 100).takeIf { !it.isNaN() } ?: 0.0)
             }%"
-        val totalCompetitionPercent: String
+        val totalPrincipalDecisionPercent: String
             get() = "${
                 String.format(
                     "%.1f",
-                    ((totalCompetition.toDouble() / totalPupils.toDouble()) * 100).takeIf { !it.isNaN() } ?: 0.0)
+                    ((totalPrincipalDecision.toDouble() / totalPupils.toDouble()) * 100).takeIf { !it.isNaN() } ?: 0.0)
             }%"
         val totalUnknownPercent: String
             get() = "${
@@ -82,26 +82,28 @@ fun fillAbsenceTemplate(
             it[AbsenceReason.ILLNESS]!!,
             it[AbsenceReason.HEALING]!!,
             it[AbsenceReason.REQUEST]!!,
-            it[AbsenceReason.COMPETITION]!!,
+            it[AbsenceReason.PRINCIPAL_DECISION]!!,
             it[AbsenceReason.UNKNOWN]!!)
     }
     val secondShiftData = absenceData.second.let {
-        AbsenceReport(pupilCount.first,
+        AbsenceReport(pupilCount.second,
             it[AbsenceReason.ILLNESS]!!,
             it[AbsenceReason.HEALING]!!,
             it[AbsenceReason.REQUEST]!!,
-            it[AbsenceReason.COMPETITION]!!,
+            it[AbsenceReason.PRINCIPAL_DECISION]!!,
             it[AbsenceReason.UNKNOWN]!!)
     }
     val report = XDocReportRegistry.getRegistry().loadReport(templateInputStream, TemplateEngineKind.Velocity)
     val fieldsMetadata = report.createFieldsMetadata().apply {
         load("firstShift", AbsenceReport::class.java)
         load("secondShift", AbsenceReport::class.java)
-        addFieldReplacement("current_date", date.toString("dd.MM.YYYY"))
-        addFieldReplacement("school_name", SCHOOL_NAME.nominative)
+        addFieldReplacement("currentDate", date.toString("dd.MM.YYYY"))
+        addFieldReplacement("schoolName", SCHOOL_NAME.nominative)
     }
     report.fieldsMetadata = fieldsMetadata
     val context = report.createContext()
+    context.put("currentDate", date.toString("dd.MM.YYYY"))
+    context.put("schoolName", SCHOOL_NAME.nominative)
     context.put("firstShift", firstShiftData)
     context.put("secondShift", secondShiftData)
     outputFile.createNewFile()

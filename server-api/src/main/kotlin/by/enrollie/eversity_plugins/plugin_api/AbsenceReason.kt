@@ -8,5 +8,5 @@
 package by.enrollie.eversity_plugins.plugin_api
 
 enum class AbsenceReason {
-    ILLNESS, HEALING, REQUEST, COMPETITION, UNKNOWN, DUMMY
+    ILLNESS, HEALING, REQUEST, PRINCIPAL_DECISION, UNKNOWN, DUMMY
 }

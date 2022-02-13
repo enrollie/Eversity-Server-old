@@ -21,8 +21,9 @@ fun fillClassAbsenceTemplate(
     templateInputStream: InputStream,
     absencePackage: List<Pair<Pupil, ExtendedPupilAbsenceStatistics>>,
     classID: Int,
-    dates: Pair<String, String>
-): File {
+    dates: Pair<String, String>,
+    file: File
+) {
     data class FillInfo(
         val classTitle: String,
         val beginDate: String,
@@ -37,7 +38,7 @@ fun fillClassAbsenceTemplate(
         val illnessLessons: Int,
         val requestLessons: Int,
         val healingLessons: Int,
-        val competitionLessons: Int,
+        val principalDecisionLessons: Int,
         val unknownDays: Int,
         val unknownLessons: Int
     )
@@ -47,7 +48,7 @@ fun fillClassAbsenceTemplate(
         val illness: Int,
         val request: Int,
         val healing: Int,
-        val competition: Int,
+        val principalDecision: Int,
         val unknownDays: Int,
         val unknownLessons: Int
     )
@@ -60,7 +61,7 @@ fun fillClassAbsenceTemplate(
             data.second.illnessLessons,
             data.second.requestLessons,
             data.second.healingLessons,
-            data.second.competitionLessons,
+            data.second.principalDecisionLessons,
             data.second.unknownDays,
             data.second.unknownLessons
         )
@@ -76,7 +77,7 @@ fun fillClassAbsenceTemplate(
         absences.sumOf { it.illnessLessons },
         absences.sumOf { it.requestLessons },
         absences.sumOf { it.healingLessons },
-        absences.sumOf { it.competitionLessons },
+        absences.sumOf { it.principalDecisionLessons },
         absences.sumOf { it.unknownDays },
         absences.sumOf { it.unknownLessons }
     )
@@ -92,7 +93,7 @@ fun fillClassAbsenceTemplate(
         addFieldAsList("absence.illnessLessons")
         addFieldAsList("absence.requestLessons")
         addFieldAsList("absence.healingLessons")
-        addFieldAsList("absence.competitionLessons")
+        addFieldAsList("absence.principalDecisionLessons") // STOPSHIP: 2/11/22 Change docx
         addFieldAsList("absence.unknownDays")
         addFieldAsList("absence.unknownLessons")
     }
@@ -102,7 +103,5 @@ fun fillClassAbsenceTemplate(
     context.put("absence", absences)
     context.put("info", fillInfo)
 
-    val tempFile = File.createTempFile("EV-Class-$classID-stat", ".docx")
-    report.process(context, tempFile.outputStream())
-    return tempFile
+    report.process(context, file.outputStream())
 }

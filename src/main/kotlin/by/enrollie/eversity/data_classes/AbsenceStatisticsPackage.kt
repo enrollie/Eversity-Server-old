@@ -14,7 +14,7 @@ data class AbsenceStatisticsPackage(
     val illness: Int,
     val healing: Int,
     val request: Int,
-    val competition: Int,
+    val principalDecision: Int,
     val unknown: Int,
 ) {
     companion object {
@@ -22,7 +22,7 @@ data class AbsenceStatisticsPackage(
             AbsenceStatisticsPackage(map[AbsenceReason.ILLNESS]!!,
                 map[AbsenceReason.HEALING]!!,
                 map[AbsenceReason.REQUEST]!!,
-                map[AbsenceReason.COMPETITION]!!,
+                map[AbsenceReason.PRINCIPAL_DECISION]!!,
                 map[AbsenceReason.UNKNOWN]!!)
     }
 
@@ -31,7 +31,7 @@ data class AbsenceStatisticsPackage(
             AbsenceReason.ILLNESS -> illness
             AbsenceReason.HEALING -> healing
             AbsenceReason.REQUEST -> request
-            AbsenceReason.COMPETITION -> competition
+            AbsenceReason.PRINCIPAL_DECISION -> principalDecision
             AbsenceReason.UNKNOWN -> unknown
             else -> 0
         }
