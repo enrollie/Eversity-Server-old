@@ -14,6 +14,7 @@ import by.enrollie.eversity.database.classesCache
 import by.enrollie.eversity.database.xodus_definitions.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
+import org.joda.time.DateTime
 
 /**
  * Returns pupil's class ID
@@ -35,9 +36,9 @@ fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): SchoolCl
  * @param classID Class ID
  * @throws NoSuchElementException Thrown, when class with that ID was not found
  */
-fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true){
+fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
     XodusClass.query((XodusClass::id eq classID)).first().let {
-        classesCache.put(classID, SchoolClass(it.id,it.classTitle,it.isSecondShift,it.classTeacher.user.id))
+        classesCache.put(classID, SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id))
         it.pupils.toList().toPupilsArray()
     }
 }
@@ -45,7 +46,9 @@ fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = sto
 fun getNonExistentPupilsIDs(pupils: List<Pupil>, store: TransientEntityStore = DATABASE) =
     store.transactional(readonly = true) {
         XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id inValues pupils.map { it.id })).toList()
-            .toPupilsArray().filter { pupil -> !pupils.map { it.id }.contains(pupil.id) }
+            .toPupilsArray().map { it.id }.let { idList ->
+                pupils.filter { it.id !in idList }
+            }
     }
 
 /**
@@ -62,8 +65,14 @@ fun assignPupilsToParents(assignList: List<Pair<Int, Int>>, store: TransientEnti
         }
     }
 
-fun getPupilsCount(store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
-    XodusPupilProfile.all().toList().groupingBy { it.schoolClass.isSecondShift }.eachCount().let {
-        Pair(it[false] ?: 0, it[true] ?: 0)
+fun getPupilsCount(day: DateTime, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusPupilProfile.filter {
+        (it.user.disableDate eq null) or (it.user.disableDate ge day)
     }
+        .toList().groupingBy {
+            println(it.user.packName().toString() + it.user.disableDate.toString())
+            it.schoolClass.isSecondShift
+        }.eachCount().let {
+            Pair(it[false] ?: 0, it[true] ?: 0)
+        }
 }

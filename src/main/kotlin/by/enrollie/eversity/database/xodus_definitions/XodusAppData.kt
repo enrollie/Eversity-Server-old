@@ -21,6 +21,7 @@ import java.io.File
 class XodusAppData(entity: Entity) : XdEntity(entity) {
     companion object : XdSingletonEntityType<XodusAppData>() {
         override fun XodusAppData.initSingleton() {
+            // Default data
             modelVersion = 1
             firstInitDate = DateTime.now()
             port = 8080

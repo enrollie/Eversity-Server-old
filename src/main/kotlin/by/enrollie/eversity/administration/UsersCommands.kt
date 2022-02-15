@@ -119,7 +119,7 @@ internal fun CommandDispatcher<String>.registerUserCommands() {
                 CLI.logger.info("CLI user requested and confirmed deletion of user with ID $userID (JSON: \'${
                     UsersJSON.encodeToString(user)
                 }\'). Executing...")
-                deleteUser(userID)
+                disableUser(userID)
             }
 
             return@executes 0

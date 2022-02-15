@@ -61,7 +61,7 @@ private fun Route.statistics() {
             val statistics = getAbsenceStatistics(date).let {
                 Pair(AbsenceStatisticsPackage.fromMap(it.first), AbsenceStatisticsPackage.fromMap(it.second))
             }
-            val pupilsCount = getPupilsCount()
+            val pupilsCount = getPupilsCount(date)
             call.respond(ShortAbsenceResponse(pupilsCount, statistics))
         }
         get("/detailed") {

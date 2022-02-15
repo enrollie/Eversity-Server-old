@@ -18,9 +18,7 @@ import by.enrollie.eversity.database.xodus_definitions.XodusUserType
 import by.enrollie.eversity.exceptions.NoSuchUserException
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
-import org.slf4j.LoggerFactory
-
-private val logger by lazy { LoggerFactory.getLogger("UsersDatabase") }
+import org.joda.time.DateTime
 
 private fun getUserData(userID: UserID) = XodusUser.query(XodusUser::id eq userID).firstOrNull()?.toUser()
 
@@ -148,7 +146,7 @@ private fun XodusUser.toUser(): User = when (this.type.toEnum()) {
  * Returns list of all registered users
  */
 fun getAllUsers(store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
-    XodusUser.all().toList().map {
+    XodusUser.query(XodusUser::disabled eq false).toList().map {
         it.toUser()
     }
 }
@@ -168,11 +166,39 @@ fun applyUserDataEdits(newUserData: User, store: TransientEntityStore = DATABASE
 }
 
 /**
- * Removes user from database (with dependent entities, like profiles and classes)
+ * Disables user. If there are any entities that depend on given user, it will fail
  */
-fun deleteUser(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
-    logger.info("Deleting user with ID $userID...")
-    XodusUser.query(XodusUser::id eq userID).first().delete()
-    logger.debug("User with ID $userID deleted, clearing caches...")
-    clearAllCaches()
+fun disableUser(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
+    XodusUser.query(XodusUser::id eq userID).firstOrNull()?.apply {
+        disabled = true
+        disableDate = DateTime.now()
+        accessTokens.clear()
+        clearAllCaches()
+    }
+}
+
+/**
+ * Returns `disabled` property of user
+ */
+fun checkIfUserIsDisabled(userID: UserID, store: TransientEntityStore = DATABASE) =
+    store.transactional(readonly = true) {
+        XodusUser.query(XodusUser::id eq userID).first().disabled
+    }
+
+/**
+ * If user is disabled, returns [DateTime] of their disable or null, if user is active
+ */
+fun getUserDisableDate(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusUser.query(XodusUser::id eq userID).first().disableDate
+}
+
+/**
+ * Sets `disabled` property to false and clears disable date
+ */
+fun enableUser(userID: UserID, store: TransientEntityStore = DATABASE) = store.transactional {
+    XodusUser.query(XodusUser::id eq userID).firstOrNull()?.apply {
+        disabled = false
+        disableDate = null
+        clearAllCaches()
+    }
 }

@@ -168,10 +168,14 @@ dependencies {
     //----END OF SHELL DEPENDENCIES
 
     //----TEST DEPENDENCIES
-    testImplementation(kotlin("test-junit"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.8.2")
+    testImplementation(kotlin("test"))
     //----END OF TEST DEPENDENCIES
     implementation(kotlin("stdlib-jdk8"))
-    testImplementation("io.ktor:ktor-server-tests:$ktorVersion")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 val compileKotlin: KotlinCompile by tasks

@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DiscordProjectSettings">
-    <option name="show" value="PROJECT" />
-    <option name="nameOverrideEnabled" value="true" />
-    <option name="nameOverrideText" value="Eversity Core" />
-    <option name="description" value="A server for schools to make class teacher's lives easier" />
+    <option name="show" value="ASK" />
+    <option name="description" value="" />
   </component>
 </project>

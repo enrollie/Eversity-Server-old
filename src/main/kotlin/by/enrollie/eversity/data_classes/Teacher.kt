@@ -30,4 +30,22 @@ class Administration(
 ) : User {
     @SerialName("userType")
     override val type: UserType = UserType.Administration
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is Administration && other !is Teacher)
+            return false
+        if (other is Teacher)
+            return other.id == id && other.firstName == firstName && other.middleName == middleName && other.lastName == lastName && other.type == type
+        other as Administration
+        return other.id == id && other.firstName == firstName && other.middleName == middleName && other.lastName == lastName && other.type == type
+    }
+
+    override fun hashCode(): Int {
+        var result = id
+        result = 31 * result + firstName.hashCode()
+        result = 31 * result + (middleName?.hashCode() ?: 0)
+        result = 31 * result + lastName.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
+    }
 }
