@@ -171,7 +171,7 @@ fun main() {
     }
     LoggerFactory.getLogger("Bootstrap").debug("Eversity Core ${EVERSITY_VERSION}; Build date: $EVERSITY_BUILD_DATE")
     val databasePath = System.getenv("DATABASE_PATH")
-        ?: error("Required system environment variable \"SCHOOL_NAMING_FILE\" is not defined!")
+        ?: error("Required system environment variable \"DATABASE_PATH\" is not defined!")
     DATABASE = initXodusDatabase(File(databasePath))
     if (!DATABASE.transactional(readonly = true) {
             XodusAppData.get().isInitialized
