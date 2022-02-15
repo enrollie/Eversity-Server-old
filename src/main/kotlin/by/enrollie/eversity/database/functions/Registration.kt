@@ -164,8 +164,8 @@ fun registerManyPupils(array: Array<Pupil>, store: TransientEntityStore = DATABA
                 XodusPupilProfile.new {
                     user = this@findOrNew
                     schoolClass =
-                        XodusClass.query(XodusClass::id eq pupil.classID).firstOrNull() ?: throw NoSuchElementException(
-                            "Class with ID ${pupil.classID} does not exist"
+                        XodusClass.query(XodusClass::id eq pupil.classId).firstOrNull() ?: throw NoSuchElementException(
+                            "Class with ID ${pupil.classId} does not exist"
                         )
                 }
             }

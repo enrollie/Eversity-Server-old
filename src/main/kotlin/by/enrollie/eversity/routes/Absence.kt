@@ -78,7 +78,7 @@ private fun Route.statistics() {
                     it.first.middleName,
                     it.first.lastName,
                     it.second.reason,
-                    it.first.classID)
+                    it.first.classId)
             }
             call.respond(data)
         }

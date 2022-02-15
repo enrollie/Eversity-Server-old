@@ -15,7 +15,6 @@ package by.enrollie.eversity/*
 import by.enrollie.eversity.data_classes.*
 import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.database.initXodusDatabase
-import com.github.ajalt.mordant.rendering.TextColors
 import jetbrains.exodus.database.TransientEntityStore
 import org.joda.time.DateTime
 import org.junit.jupiter.api.DisplayName
@@ -61,7 +60,7 @@ class Users {
     fun checkSorted() {
         val result = getPupilsInClass(123, store)
         assertContentEquals(result,
-            pupils.filter { it.classID == 123 }.sortedBy { "${it.lastName} ${it.firstName}" }.toTypedArray())
+            pupils.filter { it.classId == 123 }.sortedBy { "${it.lastName} ${it.firstName}" }.toTypedArray())
     }
 
     @Test

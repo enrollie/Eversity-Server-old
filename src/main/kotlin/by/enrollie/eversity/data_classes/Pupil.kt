@@ -16,7 +16,7 @@ data class Pupil(
     override val firstName: String,
     override val middleName: String?,
     override val lastName: String,
-    val classID: Int,
+    val classId: Int,
 ) : User {
     @SerialName("userType")
     override val type: UserType = UserType.Pupil

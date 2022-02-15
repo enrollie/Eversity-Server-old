@@ -162,8 +162,8 @@ fun removeAbsence(pupil: Pupil, date: DateTime, store: TransientEntityStore = DA
             }
             delete()
         }
-    if (XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq pupil.classID)) and (XodusAbsence::date eq date)).isEmpty) insertEmptyAbsence(
-        pupil.classID,
+    if (XodusAbsence.query((XodusAbsence::schoolClass.matches(XodusClass::id eq pupil.classId)) and (XodusAbsence::date eq date)).isEmpty) insertEmptyAbsence(
+        pupil.classId,
         date)
 }
 
