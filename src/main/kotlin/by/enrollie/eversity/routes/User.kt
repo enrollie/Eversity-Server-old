@@ -27,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import org.joda.time.DateTime
 import org.joda.time.Interval
+import org.joda.time.format.ISODateTimeFormat
 import java.time.DayOfWeek
 
 @Serializable
@@ -173,7 +174,14 @@ private fun Route.userTimetable() {
                         )
                     }
                 }
-                call.respond(Json.encodeToJsonElement(lesson))
+                call.respond(
+                    mapOf(
+                        "serverTime" to Json.encodeToJsonElement(
+                            DateTime.now()
+                                .toString(ISODateTimeFormat.dateTime())
+                        ), "lesson" to Json.encodeToJsonElement(lesson)
+                    )
+                )
             }
         }
     }
