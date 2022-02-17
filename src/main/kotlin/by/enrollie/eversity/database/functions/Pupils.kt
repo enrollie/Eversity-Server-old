@@ -15,6 +15,7 @@ import by.enrollie.eversity.database.xodus_definitions.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 import org.joda.time.DateTime
+import org.joda.time.LocalTime
 
 /**
  * Returns pupil's class ID
@@ -33,15 +34,19 @@ fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): SchoolCl
 /**
  * Returns all pupils in given class
  *
+ * @param date Date for which to get pupils list (used to get pupils list with pupils that left school on specific date)
  * @param classID Class ID
  * @throws NoSuchElementException Thrown, when class with that ID was not found
  */
-fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
-    XodusClass.query((XodusClass::id eq classID)).first().let {
-        classesCache.put(classID, SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id))
-        it.pupils.toList().toPupilsArray()
+fun getPupilsInClass(date: DateTime, classID: Int, store: TransientEntityStore = DATABASE) =
+    store.transactional(readonly = true) {
+        XodusClass.query((XodusClass::id eq classID)).first().let {
+            classesCache.put(classID, SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id))
+            it.pupils.filter {
+                (it.user.disableDate eq null) or (it.user.disableDate ge date.withTime(LocalTime.MIDNIGHT))
+            }.toList().toPupilsArray()
+        }
     }
-}
 
 fun getNonExistentPupilsIDs(pupils: List<Pupil>, store: TransientEntityStore = DATABASE) =
     store.transactional(readonly = true) {

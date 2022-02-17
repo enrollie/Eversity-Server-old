@@ -16,7 +16,7 @@ import org.joda.time.DateTime
 @Serializable
 data class Absence(
     @SerialName("pupilId")
-    val pupilID: Int,
+    val pupilID: Int?,
     @SerialName("classId")
     val classID: Int,
     @SerialName("sentBy")

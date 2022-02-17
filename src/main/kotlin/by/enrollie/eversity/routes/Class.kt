@@ -15,7 +15,6 @@ import by.enrollie.eversity.data_classes.Absence
 import by.enrollie.eversity.data_classes.ErrorResponse
 import by.enrollie.eversity.data_classes.Lesson
 import by.enrollie.eversity.data_classes.Pupil
-import by.enrollie.eversity.data_functions.areNulls
 import by.enrollie.eversity.data_functions.join
 import by.enrollie.eversity.data_functions.tryToParse
 import by.enrollie.eversity.database.functions.*
@@ -36,7 +35,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
 import org.joda.time.DateTime
 import org.joda.time.Interval
-import org.joda.time.LocalDate
 import org.joda.time.LocalTime
 import org.joda.time.format.ISODateTimeFormat
 import org.slf4j.LoggerFactory
@@ -64,7 +62,7 @@ private fun Route.classGet() {
                 classID,
                 classData.title,
                 classData.isSecondShift,
-                getPupilsInClass(classID).size,
+                getPupilsInClass(DateTime.now().withTime(LocalTime.MIDNIGHT), classID).size,
                 classData.classTeacherID,
                 getUserName(classData.classTeacherID).fullForm
             )
@@ -77,40 +75,6 @@ private data class AbsencePair(val pupil: Pupil, val absences: Set<Absence>)
 
 private fun Route.classAbsence() {
     route("/absence") {
-        get {
-            val classID =
-                (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
-                    ?: throw ParameterConversionException("classId", "classId")
-            val user = call.authentication.principal<User>()!!
-            OSO.authorize(OsoUser(user.user.id, user.user.type), "read_absence", OsoSchoolClass(classID))
-            val dates = call.request.queryParameters["startDate"]?.let {
-                val endDate =
-                    call.request.queryParameters["endDate"] ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.conditionalMissingRequiredQuery("startDate", "endDate")
-                    )
-                val parser = DefaultDateFormatter
-                Pair(
-                    parser.tryToParse(it) ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.deserializationFailure("startDate", it)
-                    ),
-                    parser.tryToParse(endDate) ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        ErrorResponse.deserializationFailure("endDate", endDate)
-                    )
-                )
-            } ?: Pair(null, null)
-            val absenceData = if (dates.areNulls) {
-                getClassAbsence(classID, LocalDate.now().toDateTime(LocalTime.MIDNIGHT))
-            } else {
-                getClassAbsence(classID, Pair(dates.first!!, dates.second!!))
-            }
-            val pupilsArray = getPupilsInClass(classID)
-            call.respond(pupilsArray.map { pupil ->
-                AbsencePair(pupil, absenceData.filter { it.pupilID == pupil.id }.toSet())
-            })
-        }
         post {
             val user = call.authentication.principal<User>()!!
             val classID =
@@ -175,7 +139,7 @@ private fun Route.absenceDate() {
             .tryToParse(call.parameters["date"] ?: throw MissingRequestParameterException("date"))
             ?: throw ParameterConversionException("date", "date")).withTime(LocalTime.MIDNIGHT)
         val absenceData = getClassAbsence(classID, date)
-        val pupilsArray = getPupilsInClass(classID)
+        val pupilsArray = getPupilsInClass(date, classID)
         call.respond(pupilsArray.map { pupil ->
             AbsencePair(pupil, absenceData.filter { it.pupilID == pupil.id }.toSet())
         })
@@ -188,7 +152,10 @@ private fun Route.pupils() {
         val classID = (call.parameters["classId"] ?: throw MissingRequestParameterException("classId")).toIntOrNull()
             ?: throw ParameterConversionException("classId", "classId")
         OSO.authorize(OsoUser(user.user.id, user.user.type), "read_members", OsoSchoolClass(classID))
-        call.respond(getPupilsInClass(classID))
+        val date = call.request.queryParameters["date"]?.let {
+            DefaultDateFormatter.tryToParse(it) ?: throw ParameterConversionException("date", "date")
+        } ?: DateTime.now().withTime(LocalTime.MIDNIGHT)
+        call.respond(getPupilsInClass(date, classID))
     }
 }
 

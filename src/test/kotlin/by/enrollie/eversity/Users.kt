@@ -17,6 +17,8 @@ import by.enrollie.eversity.database.functions.*
 import by.enrollie.eversity.database.initXodusDatabase
 import jetbrains.exodus.database.TransientEntityStore
 import org.joda.time.DateTime
+import org.joda.time.LocalDate
+import org.joda.time.LocalTime
 import org.junit.jupiter.api.DisplayName
 import java.nio.file.Files
 import kotlin.test.*
@@ -51,22 +53,26 @@ class Users {
 
     @Test
     fun getPupilsInClassWithClassID() {
-        val result = getPupilsInClass(123, store) + getPupilsInClass(125, store)
+        val dateTime = DateTime.now().withTime(LocalTime.MIDNIGHT)
+        val result = getPupilsInClass(dateTime, 123, store) + getPupilsInClass(dateTime, 125, store)
         assert(result.isNotEmpty())
         assertContentEquals(pupils, result)
     }
 
     @Test
     fun checkSorted() {
-        val result = getPupilsInClass(123, store)
+        val dateTime = DateTime.now().withTime(LocalTime.MIDNIGHT)
+        val result = getPupilsInClass(dateTime, 123, store)
         assertContentEquals(result,
-            pupils.filter { it.classId == 123 }.sortedBy { "${it.lastName} ${it.firstName}" }.toTypedArray())
+            pupils.filter { it.classId == 123 }.sortedBy { "${it.lastName} ${it.firstName}" }.toTypedArray()
+        )
     }
 
     @Test
     fun nonExistingClassFails() {
+        val dateTime = DateTime.now().withTime(LocalTime.MIDNIGHT)
         assertFailsWith<NoSuchElementException> {
-            getPupilsInClass(1, store)
+            getPupilsInClass(dateTime, 1, store)
         }
     }
 
@@ -111,9 +117,43 @@ class Users {
     fun checkDeleting() {
         disableUser(2, store)
         assert(getAllUsers(store).size == pupils.size)
-        val data = getPupilsCount(DateTime.now().plusDays(1), store)
-        assert(data.first == pupils.size - 2)
-        assert(data.second == 1)
+        val dataFirst = getPupilsCount(DateTime.now().plusDays(1), store)
+        assert(dataFirst.first == pupils.size - 2)
+        assert(dataFirst.second == 1)
+        disableUser(1223, store)
+        val dataSecond = getPupilsCount(DateTime.now().plusDays(1), store)
+        assert(dataSecond.first == pupils.size - 2)
+        assert(dataSecond.second == 0)
+
         enableUser(2, store) // Revert this test
+        val dataThird = getPupilsCount(DateTime.now().plusDays(1), store)
+        assert(dataThird.first == pupils.size - 1)
+        assert(dataThird.second == 0)
+        enableUser(1223, store)
+    }
+
+    @Test
+    @DisplayName("Check output filter in getAllUsers(date, types)")
+    fun checkFilter() {
+        val teachersList = getAllUsers(DateTime.now().withDate(LocalDate.now()), listOf("TEACHER"), store)
+        assert(teachersList.isEmpty())
+        val administrationList = getAllUsers(DateTime.now(), listOf("ADMINISTRATION"), store).toTypedArray()
+        assertContains(administrationList, teacher)
+        assert(administrationList.size == 1)
+        val pupilsList = getAllUsers(DateTime.now(), listOf("PUPIL"), store).map { it as Pupil }.toTypedArray()
+        assertContentEquals(pupilsList, pupils)
+    }
+
+    @Test
+    @DisplayName("Check getAllUsers(date, types) with disabled users")
+    fun checkAllUsersDisable(){
+        disableUser(0, store)
+        val teachersList = getAllUsers(DateTime.now().plusDays(1).withDate(LocalDate.now()), listOf("TEACHER"), store)
+        assert(teachersList.isEmpty())
+        val administrationList = getAllUsers(DateTime.now().plusDays(1), listOf("ADMINISTRATION"), store).toTypedArray()
+        assert(administrationList.isEmpty())
+        val pupilsList = getAllUsers(DateTime.now(), listOf("PUPIL"), store).map { it as Pupil }.toTypedArray()
+        assertContentEquals(pupilsList, pupils)
+        enableUser(0, store)
     }
 }

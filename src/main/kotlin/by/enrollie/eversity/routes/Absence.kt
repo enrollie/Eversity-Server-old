@@ -9,10 +9,7 @@ package by.enrollie.eversity.routes
 
 import by.enrollie.eversity.DefaultDateFormatter
 import by.enrollie.eversity.OSO
-import by.enrollie.eversity.data_classes.AbsenceReason
 import by.enrollie.eversity.data_classes.AbsenceStatisticsPackage
-import by.enrollie.eversity.data_classes.ClassID
-import by.enrollie.eversity.data_classes.UserID
 import by.enrollie.eversity.data_functions.tryToParse
 import by.enrollie.eversity.database.functions.getAbsenceStatistics
 import by.enrollie.eversity.database.functions.getDetailedAbsenceData
@@ -26,7 +23,6 @@ import io.ktor.server.auth.*
 import io.ktor.server.plugins.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.joda.time.LocalDate
 import org.joda.time.LocalTime
@@ -35,17 +31,6 @@ import org.joda.time.LocalTime
 private data class ShortAbsenceResponse(
     val pupilCount: Pair<Int, Int>,
     val absenceStatistics: Pair<AbsenceStatisticsPackage, AbsenceStatisticsPackage>,
-)
-
-@Serializable
-private data class DetailedAbsenceResponseElement(
-    val id: UserID,
-    val firstName: String,
-    val middleName: String?,
-    val lastName: String,
-    val absenceReason: AbsenceReason,
-    @SerialName("classId")
-    val classID: ClassID,
 )
 
 private fun Route.statistics() {
@@ -72,14 +57,7 @@ private fun Route.statistics() {
                     ?: throw ParameterConversionException("date",
                         "date")
             } ?: LocalDate.now().toDateTime(LocalTime.MIDNIGHT)
-            val data = getDetailedAbsenceData(date).map {
-                DetailedAbsenceResponseElement(it.first.id,
-                    it.first.firstName,
-                    it.first.middleName,
-                    it.first.lastName,
-                    it.second.reason,
-                    it.first.classId)
-            }
+            val data = getDetailedAbsenceData(date)
             call.respond(data)
         }
     }

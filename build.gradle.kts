@@ -27,7 +27,7 @@ plugins {
 group = "by.enrollie.eversity"
 version = semver.info.toString().replace(Regex("\\.sha\\.[a-z0-9]{7}"), "")
 application {
-    mainClass.set("by.enrollie.eversity.ApplicationKt")
+    mainClass.set("by.enrollie.eversity.MainKt")
 }
 
 repositories {
@@ -77,31 +77,31 @@ dependencies {
     //----END OF DATABASE DEPENDENCIES
 
     //----REPORT DEPENDENCIES
-    implementation("fr.opensagres.xdocreport:template:2.0.2") {
+    implementation("fr.opensagres.xdocreport:template:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:document:2.0.2") {
+    implementation("fr.opensagres.xdocreport:document:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:template:2.0.2") {
+    implementation("fr.opensagres.xdocreport:template:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:converter:2.0.2") {
+    implementation("fr.opensagres.xdocreport:converter:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.document.docx:2.0.2") {
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.document.docx:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.velocity:2.0.2") {
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.velocity:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }
-    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.freemarker:2.0.2") {
+    implementation("fr.opensagres.xdocreport:fr.opensagres.xdocreport.template.freemarker:2.0.3") {
         exclude("log4j")
         exclude("org.slf4j")
     }

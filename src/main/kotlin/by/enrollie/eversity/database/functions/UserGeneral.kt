@@ -202,3 +202,18 @@ fun enableUser(userID: UserID, store: TransientEntityStore = DATABASE) = store.t
         clearAllCaches()
     }
 }
+
+/**
+ * Returns list of all users in DB with possibility to filter output by type
+ */
+fun getAllUsers(
+    date: DateTime,
+    filterTypes: List<String> = UserType.values().map { it.name },
+    store: TransientEntityStore = DATABASE
+) = store.transactional(readonly = true) {
+    XodusUser.query(XodusUser::type.matches(XodusUserType::title inValues filterTypes)).filter {
+        (it.disabled eq false) or (it.disableDate ge date)
+    }.toList().map {
+        it.toUser()
+    }
+}
