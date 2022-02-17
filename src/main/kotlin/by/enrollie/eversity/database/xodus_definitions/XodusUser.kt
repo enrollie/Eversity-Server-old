@@ -31,6 +31,14 @@ class XodusUser(entity: Entity) : XdEntity(entity) {
     val profile by xdChild1(XodusBaseUserProfile::user)
     val accessTokens by xdChildren0_N(XodusToken::user)
     val schoolsByCredentials by xdChildren0_N(XodusSchoolsBy::user)
+    val persistentRoles by xdChildren0_N(XodusPersistentSchoolClassRole::user)
+    val integrations by xdChildren0_N(XodusIntegration::user)
+    var disabled by xdBooleanProp { }
+    var disableDate by xdDateTimeProp {
+        requireIf {
+            disabled
+        }
+    }
 
     fun packName(): UserName = UserName(firstName, middleName, lastName)
 }

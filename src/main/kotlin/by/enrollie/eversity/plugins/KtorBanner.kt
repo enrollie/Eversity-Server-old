@@ -7,12 +7,12 @@
 
 package by.enrollie.eversity.plugins
 
+import by.enrollie.eversity.CLI
 import by.enrollie.eversity.EVERSITY_PUBLIC_NAME
-import by.enrollie.eversity.EVERSITY_WEBSITE
 import by.enrollie.eversity.main
 import com.github.ajalt.mordant.rendering.TextColors
-import com.github.ajalt.mordant.terminal.Terminal
-import io.ktor.application.*
+import com.github.ajalt.mordant.rendering.TextStyles
+import io.ktor.server.application.*
 import team.yi.kfiglet.FigFont
 import team.yi.ktor.features.banner
 
@@ -22,20 +22,35 @@ fun Application.configureBanner() {
         smushMode = 100
         loadFigFont = {
             val inputStream = ::main.javaClass.classLoader.getResourceAsStream("slant.flf")
-            FigFont.loadFigFont(inputStream)
+            FigFont.loadFigFont(inputStream!!)
         }
         beforeBanner { banner ->
-            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
+            CLI.lineReader.apply {
+                val welcomeMessage = "Welcome to"
+                printAbove(
+                    "".padStart(
+                        (banner.width - welcomeMessage.length) / 2,
+                        ' '
+                    ) + TextColors.brightGreen(welcomeMessage) + "".padStart(
+                        (banner.width - welcomeMessage.length) / 2,
+                        ' '
+                    )
+                )
+                printAbove((TextColors.blue("".padStart(banner.width, '-'))))
+            }
         }
         render {
-            Terminal().println(TextColors.red(it.text))
+            CLI.lineReader.printAbove(TextColors.rgb(194, 1, 20)(it.text))
         }
         afterBanner { banner ->
             val title = " $EVERSITY_PUBLIC_NAME "
-            val homepage = " $EVERSITY_WEBSITE "
-            val filling = "".padEnd(banner.width - title.length - homepage.length, ' ')
-            Terminal().println((TextColors.blue("".padStart(banner.width, '-'))))
-            Terminal().println(TextColors.brightBlue("$title$filling$homepage\n\n"))
+            CLI.lineReader.apply {
+                printAbove((TextColors.blue("".padStart(banner.width, '-'))))
+                printAbove(TextColors.blue("Version: ") + TextColors.brightGreen(title))
+                printAbove("")
+                printAbove(TextColors.red(TextStyles.bold("! WARNING !  ") + TextStyles.italic("These logs may contain private information (like access credentials). Please, be careful on who you let to see these logs.")))
+                printAbove("")
+            }
         }
     }
 }

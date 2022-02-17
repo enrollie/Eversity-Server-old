@@ -11,7 +11,16 @@ import com.neitex.SchoolsByUserType
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class UserType { Teacher, Parent, Pupil, SYSTEM, Social, Administration }
+enum class UserType {
+    Teacher, Parent, Pupil, SYSTEM, Social, Administration;
+
+    companion object {
+        fun lenientValueOf(input: String): UserType =
+            values().associateWith { it.name.lowercase() }.entries.find { it.value == input.lowercase() }?.key
+                ?: throw IllegalArgumentException("No such enum entity as $input")
+
+    }
+}
 
 fun SchoolsByUserType.toUserType(): UserType = when (this) {
     SchoolsByUserType.PUPIL -> UserType.Pupil

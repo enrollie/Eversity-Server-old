@@ -14,13 +14,15 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import org.joda.time.DateTime
+import java.util.concurrent.TimeUnit
 
 class DateTimeSerializer : KSerializer<DateTime> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DateTime", PrimitiveKind.STRING)
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DateTime", PrimitiveKind.LONG)
 
     override fun serialize(encoder: Encoder, value: DateTime) {
-        encoder.encodeString(value.toString())
+        encoder.encodeLong(TimeUnit.MILLISECONDS.toSeconds(value.millis))
     }
 
-    override fun deserialize(decoder: Decoder): DateTime = DateTime.parse(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): DateTime =
+        DateTime(TimeUnit.SECONDS.toMillis(decoder.decodeLong()))
 }

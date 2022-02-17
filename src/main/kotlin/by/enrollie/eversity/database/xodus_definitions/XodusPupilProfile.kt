@@ -31,4 +31,4 @@ class XodusPupilProfile(entity: Entity) : XodusBaseUserProfile(entity) {
 
 fun List<XodusPupilProfile>.toPupilsArray(): Array<Pupil> = this.map {
     Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, it.schoolClass.id)
-}.toTypedArray()
+}.sortedBy { "${it.lastName} ${it.firstName}" }.toTypedArray()

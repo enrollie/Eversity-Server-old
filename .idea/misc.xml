@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="EntryPointsManager">
-    <list size="3">
-      <item index="0" class="java.lang.String" itemvalue="kotlinx.serialization.Serializable" />
-      <item index="1" class="java.lang.String" itemvalue="kotlinx.serialization.Serializable" />
-      <item index="2" class="java.lang.String" itemvalue="kotlinx.serialization.Serializable" />
-    </list>
-  </component>
   <component name="ExternalStorageConfigurationManager" enabled="true" />
   <component name="FrameworkDetectionExcludesConfiguration">
     <file type="web" url="file://$PROJECT_DIR$" />
   </component>
-  <component name="PWA">
-    <option name="enabled" value="true" />
-    <option name="wasEnabledAtLeastOnce" value="true" />
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_16" default="true" project-jdk-name="16" project-jdk-type="JavaSDK" />
+  <component name="ProjectType">
+    <option name="id" value="jpab" />
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_16" default="true" project-jdk-name="16 (2)" project-jdk-type="JavaSDK">
-    <output url="file://$PROJECT_DIR$/out" />
+  <component name="UnattendedHostPersistenceState">
+    <option name="openedFilesInfos">
+      <list>
+        <OpenedFileInfo>
+          <option name="caretOffset" value="527" />
+          <option name="fileUrl" value="file://$PROJECT_DIR$/src/main/kotlin/by/enrollie/eversity/database/functions/Pupils.kt" />
+        </OpenedFileInfo>
+      </list>
+    </option>
   </component>
 </project>

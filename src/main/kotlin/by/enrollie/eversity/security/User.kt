@@ -7,11 +7,7 @@
 
 package by.enrollie.eversity.security
 
-import by.enrollie.eversity.data_classes.UserType
-import io.ktor.auth.*
+import by.enrollie.eversity.data_classes.User
+import io.ktor.server.auth.*
 
-class User(ID: Int, userType: UserType, accessToken: String) :Principal {
-    val id: Int = ID
-    val type: UserType = userType
-    val token:String = accessToken
-}
+data class User(val user: User, val accessToken: String) : Principal

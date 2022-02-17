@@ -9,13 +9,13 @@ package by.enrollie.eversity.database.functions
 
 import by.enrollie.eversity.DATABASE
 import by.enrollie.eversity.data_classes.Pupil
+import by.enrollie.eversity.data_classes.SchoolClass
 import by.enrollie.eversity.database.classesCache
-import by.enrollie.eversity.database.xodus_definitions.XodusParentProfile
-import by.enrollie.eversity.database.xodus_definitions.XodusPupilProfile
-import by.enrollie.eversity.database.xodus_definitions.XodusUser
-import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
+import by.enrollie.eversity.database.xodus_definitions.*
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
+import org.joda.time.DateTime
+import org.joda.time.LocalTime
 
 /**
  * Returns pupil's class ID
@@ -24,27 +24,36 @@ import kotlinx.dnq.query.*
  * @return Class ID
  * @throws IllegalArgumentException Thrown, if user was not found in pupils list
  */
-fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): Int = store.transactional(readonly = true) {
-    XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq userID)).firstOrNull()?.schoolClass?.id
-        ?: throw IllegalArgumentException("Pupil with ID $userID does not exist")
-}
+fun getPupilClass(userID: Int, store: TransientEntityStore = DATABASE): SchoolClass =
+    store.transactional(readonly = true) {
+        XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id eq userID))
+            .firstOrNull()?.schoolClass?.toSchoolClass()
+            ?: throw IllegalArgumentException("Pupil with ID $userID does not exist")
+    }
 
 /**
  * Returns all pupils in given class
  *
+ * @param date Date for which to get pupils list (used to get pupils list with pupils that left school on specific date)
  * @param classID Class ID
  * @throws NoSuchElementException Thrown, when class with that ID was not found
  */
-fun getPupilsInClass(classID: Int, store: TransientEntityStore = DATABASE) = classesCache.get(classID) {
+fun getPupilsInClass(date: DateTime, classID: Int, store: TransientEntityStore = DATABASE) =
     store.transactional(readonly = true) {
-        getClassInDB(classID)
+        XodusClass.query((XodusClass::id eq classID)).first().let {
+            classesCache.put(classID, SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id))
+            it.pupils.filter {
+                (it.user.disableDate eq null) or (it.user.disableDate ge date.withTime(LocalTime.MIDNIGHT))
+            }.toList().toPupilsArray()
+        }
     }
-}.pupils
 
 fun getNonExistentPupilsIDs(pupils: List<Pupil>, store: TransientEntityStore = DATABASE) =
     store.transactional(readonly = true) {
         XodusPupilProfile.query(XodusPupilProfile::user.matches(XodusUser::id inValues pupils.map { it.id })).toList()
-            .toPupilsArray().filter { pupil -> !pupils.map { it.id }.contains(pupil.id) }
+            .toPupilsArray().map { it.id }.let { idList ->
+                pupils.filter { it.id !in idList }
+            }
     }
 
 /**
@@ -60,3 +69,15 @@ fun assignPupilsToParents(assignList: List<Pair<Int, Int>>, store: TransientEnti
                 )
         }
     }
+
+fun getPupilsCount(day: DateTime, store: TransientEntityStore = DATABASE) = store.transactional(readonly = true) {
+    XodusPupilProfile.filter {
+        (it.user.disableDate eq null) or (it.user.disableDate ge day)
+    }
+        .toList().groupingBy {
+            println(it.user.packName().toString() + it.user.disableDate.toString())
+            it.schoolClass.isSecondShift
+        }.eachCount().let {
+            Pair(it[false] ?: 0, it[true] ?: 0)
+        }
+}

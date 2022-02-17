@@ -7,8 +7,12 @@
 
 package by.enrollie.eversity.data_classes
 
+import kotlinx.serialization.SerialName
+
 interface User {
     val id: Int
+
+    @SerialName("userType")
     val type: UserType
     val firstName: String
     val middleName: String?
@@ -16,3 +20,5 @@ interface User {
 }
 
 typealias UserID = Int
+
+fun Int.evaluateToUserID(currentUserID: UserID): UserID = if (this == -1) currentUserID else this

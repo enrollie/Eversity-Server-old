@@ -14,15 +14,24 @@ data class AbsenceStatisticsPackage(
     val illness: Int,
     val healing: Int,
     val request: Int,
-    val competition: Int,
-    val unknown: Int
+    val principalDecision: Int,
+    val unknown: Int,
 ) {
+    companion object {
+        fun fromMap(map: Map<AbsenceReason, Int>): AbsenceStatisticsPackage =
+            AbsenceStatisticsPackage(map[AbsenceReason.ILLNESS]!!,
+                map[AbsenceReason.HEALING]!!,
+                map[AbsenceReason.REQUEST]!!,
+                map[AbsenceReason.PRINCIPAL_DECISION]!!,
+                map[AbsenceReason.UNKNOWN]!!)
+    }
+
     operator fun get(reasonType: AbsenceReason): Int =
         when (reasonType) {
             AbsenceReason.ILLNESS -> illness
             AbsenceReason.HEALING -> healing
             AbsenceReason.REQUEST -> request
-            AbsenceReason.COMPETITION -> competition
+            AbsenceReason.PRINCIPAL_DECISION -> principalDecision
             AbsenceReason.UNKNOWN -> unknown
             else -> 0
         }

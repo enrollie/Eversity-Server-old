@@ -21,6 +21,15 @@ class XodusUserType(entity: Entity) : XdEnumEntity(entity) {
         val SOCIAL_TEACHER by enumField { title = "Social" }
         val ADMINISTRATION by enumField { title = "Administration" }
         val SYSTEM by enumField { title = "SYSTEM" }
+
+        fun fromEnum(type: UserType): XodusUserType = when (type) {
+            UserType.Teacher -> TEACHER
+            UserType.Parent -> PARENT
+            UserType.Pupil -> PUPIL
+            UserType.SYSTEM -> SYSTEM
+            UserType.Social -> SOCIAL_TEACHER
+            UserType.Administration -> ADMINISTRATION
+        }
     }
 
     var title by xdRequiredStringProp(unique = true)

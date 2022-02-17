@@ -17,7 +17,7 @@ class XodusAbsenceReason(entity: Entity) : XdEnumEntity(entity) {
         val ILLNESS by enumField { title = AbsenceReason.ILLNESS.name }
         val HEALING by enumField { title = AbsenceReason.HEALING.name }
         val REQUEST by enumField { title = AbsenceReason.REQUEST.name }
-        val COMPETITION by enumField { title = AbsenceReason.COMPETITION.name }
+        val PRINCIPAL_DECISION by enumField { title = AbsenceReason.PRINCIPAL_DECISION.name }
         val UNKNOWN by enumField { title = AbsenceReason.UNKNOWN.name }
         val DUMMY by enumField { title = AbsenceReason.DUMMY.name }
         fun XodusAbsenceReason.toAbsenceReason(): AbsenceReason = AbsenceReason.valueOf(this.title)
@@ -35,5 +35,5 @@ class XodusAbsence(entity: Entity) : XdEntity(entity) {
     var lessons by xdSetProp<XodusAbsence, Short>()
     var reason by xdLink1(XodusAbsenceReason)
     var sentBy by xdLink0_1(XodusUser)
-    var additionalNotes by xdLink0_1(XodusAbsenceNotes)
+    var lastChangeDate by xdRequiredDateTimeProp { }
 }

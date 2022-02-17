@@ -8,9 +8,9 @@
 package by.enrollie.eversity.plugins
 
 import by.enrollie.eversity.EVERSITY_PUBLIC_NAME
-import io.ktor.application.*
-import io.ktor.features.*
 import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 
 fun Application.configureHTTP() {
     install(DefaultHeaders) {

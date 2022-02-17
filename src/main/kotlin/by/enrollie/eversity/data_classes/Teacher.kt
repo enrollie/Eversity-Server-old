@@ -7,11 +7,7 @@
 
 package by.enrollie.eversity.data_classes
 
-import by.enrollie.eversity.database.xodus_definitions.XodusClass
-import by.enrollie.eversity.database.xodus_definitions.XodusTeacherProfile
-import by.enrollie.eversity.database.xodus_definitions.XodusUser
-import jetbrains.exodus.database.TransientEntityStore
-import kotlinx.dnq.query.*
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -19,23 +15,37 @@ class Teacher(
     override val id: Int,
     override val firstName: String,
     override val middleName: String?,
-    override val lastName: String
+    override val lastName: String,
 ) : User {
+    @SerialName("userType")
     override val type: UserType = UserType.Teacher
+}
 
-    fun teacherClass(store: TransientEntityStore) = store.transactional {
-        XodusClass.query((XodusClass::classTeacher).matches(XodusTeacherProfile::user.matches(XodusUser::id eq this.id)))
-            .firstOrNull()?.let {
-                SchoolClass(it.id, it.classTitle, it.isSecondShift, it.classTeacher.user.id, it.pupils.toList().map {
-                    Pupil(it.user.id, it.user.firstName, it.user.middleName, it.user.lastName, it.schoolClass.id)
-                }.toTypedArray())
-            }
+@Serializable
+class Administration(
+    override val id: Int,
+    override val firstName: String,
+    override val middleName: String?,
+    override val lastName: String,
+) : User {
+    @SerialName("userType")
+    override val type: UserType = UserType.Administration
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is Administration && other !is Teacher)
+            return false
+        if (other is Teacher)
+            return other.id == id && other.firstName == firstName && other.middleName == middleName && other.lastName == lastName && other.type == type
+        other as Administration
+        return other.id == id && other.firstName == firstName && other.middleName == middleName && other.lastName == lastName && other.type == type
     }
 
-    companion object {
-        fun fromUserData(store: TransientEntityStore, user: User): Teacher {
-            check(user.type == UserType.Teacher)
-            return Teacher(user.id, user.firstName, user.middleName, user.lastName)
-        }
+    override fun hashCode(): Int {
+        var result = id
+        result = 31 * result + firstName.hashCode()
+        result = 31 * result + (middleName?.hashCode() ?: 0)
+        result = 31 * result + lastName.hashCode()
+        result = 31 * result + type.hashCode()
+        return result
     }
 }

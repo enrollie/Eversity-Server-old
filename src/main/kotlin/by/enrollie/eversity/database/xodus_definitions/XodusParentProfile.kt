@@ -9,7 +9,6 @@ package by.enrollie.eversity.database.xodus_definitions
 
 import jetbrains.exodus.entitystore.Entity
 import kotlinx.dnq.XdNaturalEntityType
-import kotlinx.dnq.xdChild0_1
 import kotlinx.dnq.xdLink0_N
 
 class XodusParentProfile(entity: Entity) : XodusBaseUserProfile(entity) {
@@ -22,5 +21,4 @@ class XodusParentProfile(entity: Entity) : XodusBaseUserProfile(entity) {
     }
 
     val pupils by xdLink0_N(XodusPupilProfile)
-    val telegramData by xdChild0_1(XodusTelegramData::parentProfile)
 }

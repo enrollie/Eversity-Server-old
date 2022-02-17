@@ -7,7 +7,7 @@
 
 package by.enrollie.eversity.data_functions
 
-import by.enrollie.eversity.data_classes.DayOfWeek
+import java.time.DayOfWeek
 import java.util.*
 
 /**

@@ -15,7 +15,6 @@ import by.enrollie.eversity.database.teacherTimetableCache
 import by.enrollie.eversity.database.xodus_definitions.XodusTeacherProfile
 import by.enrollie.eversity.database.xodus_definitions.XodusUser
 import by.enrollie.eversity.database.xodus_definitions.XodusUserType
-import by.enrollie.eversity.database.xodus_definitions.toPupilsArray
 import jetbrains.exodus.database.TransientEntityStore
 import kotlinx.dnq.query.*
 import kotlinx.serialization.decodeFromString
@@ -48,8 +47,7 @@ fun getTeacherClass(teacherID: Int, store: TransientEntityStore = DATABASE): Sch
                         it.id,
                         it.classTitle,
                         it.isSecondShift,
-                        it.classTeacher.user.id,
-                        it.pupils.toList().toPupilsArray()
+                        it.classTeacher.user.id
                     )
                 }
             if (schoolClass != null)

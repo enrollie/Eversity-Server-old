@@ -7,6 +7,7 @@
 
 package by.enrollie.eversity.data_classes
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 typealias ClassID = Int
@@ -16,8 +17,8 @@ data class SchoolClass(
     val id: Int,
     val title: String,
     val isSecondShift: Boolean,
+    @SerialName("classTeacherId")
     val classTeacherID: Int,
-    val pupils: Array<Pupil>
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -27,7 +28,6 @@ data class SchoolClass(
 
         if (title != other.title) return false
         if (classTeacherID != other.classTeacherID) return false
-        if (!pupils.contentEquals(other.pupils)) return false
 
         return true
     }
@@ -36,7 +36,6 @@ data class SchoolClass(
         var result = id
         result = 31 * result + title.hashCode()
         result = 31 * result + classTeacherID
-        result = 31 * result + pupils.contentHashCode()
         return result
     }
 }

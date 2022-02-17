@@ -151,6 +151,7 @@ gradle-app.setting
 
 # End of https://www.toptal.com/developers/gitignore/api/kotlin,intellij,gradle
 
-.eversity-archive-logs
 school_naming.properties
 .env
+plugins
+logs

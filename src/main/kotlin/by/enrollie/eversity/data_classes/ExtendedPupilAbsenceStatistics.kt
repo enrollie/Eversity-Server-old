@@ -11,7 +11,7 @@ data class ExtendedPupilAbsenceStatistics(
     val illnessLessons: Int,
     val healingLessons: Int,
     val requestLessons: Int,
-    val competitionLessons: Int,
+    val principalDecisionLessons: Int,
     val unknownLessons: Int,
     val unknownDays: Int
 ) {
@@ -22,11 +22,11 @@ data class ExtendedPupilAbsenceStatistics(
         absenceList.filter
         { it.reason == AbsenceReason.REQUEST }.sumOf { it.lessonsList.size },
         absenceList.filter
-        { it.reason == AbsenceReason.COMPETITION }.sumOf { it.lessonsList.size },
+        { it.reason == AbsenceReason.PRINCIPAL_DECISION }.sumOf { it.lessonsList.size },
         absenceList.filter { it.reason == AbsenceReason.UNKNOWN }.sumOf { it.lessonsList.size },
         absenceList.filter { it.reason == AbsenceReason.UNKNOWN && it.lessonsList.contains(1) }
             .sumOf { it.lessonsList.size })
 
     val sumLessons: Int
-        get() = illnessLessons + healingLessons + requestLessons + competitionLessons + unknownLessons
+        get() = illnessLessons + healingLessons + requestLessons + principalDecisionLessons + unknownLessons
 }
